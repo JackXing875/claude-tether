@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0-beta.2 — 2026-10-24
+
+- Use Tether as the display name and `tether` as the primary installed command.
+- Retain `claude-tether` as a compatibility command and keep existing package, repository and configuration paths so upgrades reuse saved settings.
+- Update command help and current operating guides, and verify both executable names in the packaged installation check.
+
 ## 0.3.0-beta.1 — 2026-10-23
 
 - Default Linux/WSL network isolation blocks direct IP egress even when Claude settings override proxy variables; unsupported isolation stops startup without fallback. Explicit proxy compatibility mode remains available.

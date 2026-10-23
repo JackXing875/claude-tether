@@ -17,9 +17,12 @@ try {
   // Install as a user would, without the checkout's TypeScript on PATH.
   const env = { ...process.env, PATH: [dirname(process.execPath), '/usr/bin', '/bin'].join(delimiter) };
   execFileSync(npm, ['install', '--global', '--prefix', directory, '--no-audit', '--no-fund', join(directory, filename)], { stdio: 'inherit', cwd: directory, env });
-  const executable = join(directory, 'bin', 'claude-tether');
   const metadata = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
-  assert.equal(execFileSync(executable, ['--version'], { encoding: 'utf8' }).trim(), metadata.version);
-  assert.match(execFileSync(executable, ['--help'], { encoding: 'utf8' }), /claude-tether setup/);
-  console.log('Package installation, executable entry point, version and source contents verified.');
+  for (const name of ['tether', 'claude-tether']) {
+    const executable = join(directory, 'bin', name);
+    assert.equal(execFileSync(executable, ['--version'], { encoding: 'utf8' }).trim(), metadata.version);
+    assert.match(execFileSync(executable, ['--help'], { encoding: 'utf8' }), /Usage: tether/);
+    assert.match(execFileSync(executable, ['--help'], { encoding: 'utf8' }), /tether setup/);
+  }
+  console.log('Package installation, tether and compatibility entry points, version and source contents verified.');
 } finally { await rm(directory, { recursive: true, force: true }); }

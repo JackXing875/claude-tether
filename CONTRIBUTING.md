@@ -1,6 +1,6 @@
 # Contributing
 
-Claude Tether is an early beta focused on a small, dependable launch and transport layer. Please open an issue before adding a major capability, a runtime dependency or a server-side component.
+Tether is an early beta focused on a small, dependable launch and transport layer. Please open an issue before adding a major capability, a runtime dependency or a server-side component.
 
 ## Development environment
 
