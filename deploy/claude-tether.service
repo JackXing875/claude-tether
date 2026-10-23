@@ -1,0 +1,27 @@
+[Unit]
+Description=Claude Tether personal relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=claude-relay
+Group=claude-relay
+WorkingDirectory=/var/lib/claude-relay/tether
+Environment=HOME=/var/lib/claude-relay
+Environment=PATH=/var/lib/claude-relay/.local/bin:/opt/personal-relay/runtime/node-v24.14.0-linux-x64/bin:/usr/local/bin:/usr/bin:/bin
+Environment=DISABLE_AUTOUPDATER=1
+ExecStart=/opt/personal-relay/runtime/node-v24.14.0-linux-x64/bin/node /opt/personal-relay/current/lib/node_modules/claude-tether/bin/tether.mjs server --runtime claude --state /var/lib/claude-relay/tether/relay.sqlite --runtime-state /var/lib/claude-relay/tether/runtime --claude /var/lib/claude-relay/.local/bin/claude
+Restart=on-failure
+RestartSec=5
+KillMode=control-group
+TimeoutStopSec=15
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/claude-relay
+
+[Install]
+WantedBy=multi-user.target

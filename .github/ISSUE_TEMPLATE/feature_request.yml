@@ -1,0 +1,16 @@
+name: Feature request
+description: Describe a concrete workflow or missing capability.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Workflow and current limitation
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome and acceptance criteria
+      description: Explain how to verify the feature while preserving local permission and execution boundaries.
+    validations:
+      required: true

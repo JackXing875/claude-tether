@@ -1,0 +1,134 @@
+{
+  "date": "2026-10-23",
+  "core_commit": "4ae40496b32658152380720e4ed974bbb4fb6c2f",
+  "official_cli": "2.1.267",
+  "node": "24.14.0",
+  "auth_method": "claude.ai",
+  "transport": "SSH from WSL to dedicated VPS account",
+  "p0": {
+    "probe": {
+      "expected_version": "2.1.267",
+      "runtime": "official CLI subprocess",
+      "auth_verified": true,
+      "first_turn": true,
+      "explicit_resume": true,
+      "mcp_marker_seen": true,
+      "mcp_call_seen": true,
+      "resumed_marker_seen": true
+    },
+    "exit_code": 0,
+    "elapsed_ms": 13038,
+    "maximum_child_rss_kib": 278504
+  },
+  "local_project_acceptance": {
+    "official_runtime": true,
+    "stages": {
+      "local_edit_test": {
+        "passed": true,
+        "elapsed_ms": 20068,
+        "first_text_ms": 3757,
+        "text_events": 50,
+        "tools": [
+          {
+            "name": "workspace_info",
+            "status": "SUCCEEDED"
+          },
+          {
+            "name": "list_files",
+            "status": "SUCCEEDED"
+          },
+          {
+            "name": "search_text",
+            "status": "SUCCEEDED"
+          },
+          {
+            "name": "read_file",
+            "status": "SUCCEEDED"
+          },
+          {
+            "name": "read_file",
+            "status": "SUCCEEDED"
+          },
+          {
+            "name": "read_file",
+            "status": "SUCCEEDED"
+          },
+          {
+            "name": "edit_text",
+            "status": "SUCCEEDED"
+          },
+          {
+            "name": "run_command",
+            "status": "SUCCEEDED"
+          }
+        ],
+        "project_path_matches": true,
+        "test_exit_code": 0
+      },
+      "command_dedup": {
+        "passed": true,
+        "execution_count": 1
+      },
+      "server_restart_resume": {
+        "passed": true,
+        "elapsed_ms": 5929,
+        "same_session": true,
+        "worker_epoch": 2,
+        "tool_calls": 0
+      },
+      "permission_denial": {
+        "passed": true,
+        "file_unchanged": true
+      },
+      "edit_conflict": {
+        "passed": true,
+        "external_change_preserved": true
+      },
+      "cancel": {
+        "passed": true,
+        "local_process_stopped": true,
+        "elapsed_ms": 529
+      },
+      "disconnect": {
+        "passed": true,
+        "local_process_stopped": true,
+        "elapsed_ms": 311
+      },
+      "reconnect_after_disconnect": {
+        "passed": true,
+        "prior_operations_not_replayed": true,
+        "worker_epoch": 4
+      }
+    },
+    "passed": true,
+    "initial_reconnect_transport_error": "ECONNRESET",
+    "local_journal_counts": [
+      {
+        "state": "CANCELLED",
+        "n": 2
+      },
+      {
+        "state": "DENIED",
+        "n": 1
+      },
+      {
+        "state": "FAILED",
+        "n": 1
+      },
+      {
+        "state": "SUCCEEDED",
+        "n": 10
+      }
+    ]
+  },
+  "remote_observation": {
+    "remote_project_copy_absent": true,
+    "ephemeral_files_count": 0,
+    "service_resources": [
+      "MemoryCurrent=273813504",
+      "MemoryPeak=473432064",
+      "CPUUsageNSec=20933145000",
+      "TasksCurrent=7"
+    ]
+  }
+}
