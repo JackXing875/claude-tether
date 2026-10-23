@@ -1,6 +1,6 @@
 {
   "name": "claude-tether",
-  "version": "0.2.0-beta.1",
+  "version": "0.3.0-beta.1",
   "type": "module",
   "license": "GPL-3.0-only",
   "author": "JackXing875",
@@ -13,16 +13,17 @@
     "url": "https://github.com/JackXing875/claude-tether/issues"
   },
   "keywords": ["claude-code", "ssh", "proxy", "tunnel"],
-  "description": "Run local Claude Code through a reconnecting SSH tunnel to your VPS",
+  "description": "Run local Claude Code with isolated networking through a reconnecting SSH tunnel",
   "bin": {
     "claude-tether": "dist/src/cli.js"
   },
-  "files": ["dist/src", "src", "tsconfig.json", ".nvmrc", "README.md", "LICENSE", "CHANGELOG.md", "docs/RUNBOOK.md"],
+  "files": ["dist/src", "src", "tsconfig.json", ".nvmrc", "README.md", "LICENSE", "CHANGELOG.md", "CONTRIBUTING.md", "SECURITY.md", "START.md", "docs"],
   "engines": {
     "node": ">=24.14.0 <25"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "npm run clean && tsc -p tsconfig.json",
     "check": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && node --test dist/tests/*.test.js",
     "tether": "node dist/src/cli.js",

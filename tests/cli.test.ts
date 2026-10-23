@@ -62,7 +62,7 @@ test('termination closes Claude and the SSH tunnel without leaving the wrapper r
   const fixture = await sshFixture(t);
   const fake = join(fixture.directory, 'long-running-claude.mjs');
   await writeFile(fake, `console.log(process.pid); setInterval(() => {}, 1000);`);
-  const child = spawn(process.execPath, [cli, '--ssh', 'test-vps', '--ssh-config', fixture.config, '--claude', process.execPath, '--', fake], { env: { ...process.env, XDG_CONFIG_HOME: fixture.directory } });
+  const child = spawn(process.execPath, [cli, '--network', 'proxy', '--ssh', 'test-vps', '--ssh-config', fixture.config, '--claude', process.execPath, '--', fake], { env: { ...process.env, XDG_CONFIG_HOME: fixture.directory } });
   t.after(() => child.kill('SIGKILL'));
   let stdout = '';
   child.stdout.on('data', chunk => { stdout += String(chunk); });
@@ -93,7 +93,7 @@ test('one-time setup enables plain launch and doctor without modifying saved pre
   assert.match(setup.stdout, /Run claude-tether from your project directory/);
   const path = join(fixture.directory, 'claude-tether', 'config.json');
   const saved = await readFile(path, 'utf8');
-  assert.deepEqual(JSON.parse(saved), { ssh: 'test-vps', sshConfig: fixture.config, claude: process.execPath });
+  assert.deepEqual(JSON.parse(saved), { ssh: 'test-vps', sshConfig: fixture.config, claude: process.execPath, network: 'isolated' });
   assert.equal((await stat(path)).mode & 0o777, 0o600);
   const fake = join(fixture.directory, 'saved-default.mjs');
   await writeFile(fake, 'console.log("saved-default-launched");');

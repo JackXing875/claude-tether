@@ -3,7 +3,7 @@ import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-export interface Settings { ssh?: string; sshConfig?: string; claude?: string }
+export interface Settings { ssh?: string; sshConfig?: string; claude?: string; network?: 'isolated' | 'proxy'; ccproxyPort?: string }
 
 export function settingsPath(): string {
   return join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'claude-tether', 'config.json');
@@ -20,10 +20,12 @@ export async function readSettings(path = settingsPath()): Promise<Settings> {
     const settings: unknown = JSON.parse(contents);
     if (!settings || typeof settings !== 'object' || Array.isArray(settings)) throw new Error();
     for (const [key, value] of Object.entries(settings)) {
-      if (!['ssh', 'sshConfig', 'claude'].includes(key) || typeof value !== 'string' || !value.trim()) throw new Error();
+      if (!['ssh', 'sshConfig', 'claude', 'network', 'ccproxyPort'].includes(key) || typeof value !== 'string' || !value.trim()) throw new Error();
+      if (key === 'network' && !['isolated', 'proxy'].includes(value)) throw new Error();
+      if (key === 'ccproxyPort' && (!/^\d{1,5}$/.test(value) || Number(value) < 1 || Number(value) > 65535)) throw new Error();
     }
     return settings as Settings;
-  } catch { throw new Error(`Invalid settings in ${path}. Expected ssh, sshConfig and/or claude strings.`); }
+  } catch { throw new Error(`Invalid settings in ${path}. Expected ssh, sshConfig, claude, network (isolated/proxy) and/or ccproxyPort strings.`); }
 }
 
 export async function saveSettings(settings: Settings, path = settingsPath()): Promise<void> {

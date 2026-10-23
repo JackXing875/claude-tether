@@ -1,0 +1,230 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-23T11:54:49.971Z",
+  "sourceCommit": "27ddf6309ede32eb5a71304ab46346d6c488d94c",
+  "packageVersion": "0.2.0-beta.1",
+  "environment": {
+    "client": "Ubuntu 24.04 / WSL2 x64",
+    "node": "24.14.0",
+    "claudeCode": "2.1.267",
+    "sshClient": "OpenSSH_9.6p1",
+    "authMethod": "claude.ai",
+    "subscriptionType": "pro",
+    "server": "personal VPS",
+    "serverVcpu": 1,
+    "serverMemoryMiB": 950,
+    "serverMemoryAvailableAfterMiB": 683,
+    "serverLoadAfter": "0.03, 0.06, 0.08"
+  },
+  "sourceScope": {
+    "runtimeSourceUnmodified": true,
+    "localBuildFix": "Clear dist before TypeScript compilation"
+  },
+  "automatedChecks": {
+    "testsPassed": 20,
+    "testsFailed": 0,
+    "typecheckPassed": true,
+    "packageInstallPassed": true,
+    "productionAuditVulnerabilities": 0
+  },
+  "modelTurns": [
+    {
+      "name": "tools-and-context",
+      "exitCode": 0,
+      "durationMs": 63189,
+      "firstTextMs": 38896,
+      "streamEvents": 307,
+      "models": [
+        "claude-sonnet-5"
+      ],
+      "tools": [
+        "Glob",
+        "ToolSearch",
+        "Read",
+        "Read",
+        "mcp__tether_fixture__echo_nonce",
+        "Edit",
+        "Bash",
+        "Write",
+        "Read",
+        "Write"
+      ],
+      "resultSubtype": "success",
+      "isError": false,
+      "sessionMatches": true
+    },
+    {
+      "name": "resume-and-model-switch",
+      "exitCode": 0,
+      "durationMs": 15437,
+      "firstTextMs": 14681,
+      "streamEvents": 12,
+      "models": [
+        "claude-opus-5"
+      ],
+      "tools": [],
+      "resultSubtype": "success",
+      "isError": false,
+      "sessionMatches": true
+    }
+  ],
+  "projectContextLoaded": true,
+  "freshMcpChallenge": true,
+  "projectTestsPassed": true,
+  "hookEvents": [
+    {
+      "event": "SessionStart"
+    },
+    {
+      "event": "PostToolUse",
+      "tool": "Glob"
+    },
+    {
+      "event": "PostToolUse",
+      "tool": "ToolSearch"
+    },
+    {
+      "event": "PostToolUse",
+      "tool": "Read"
+    },
+    {
+      "event": "PostToolUse",
+      "tool": "Read"
+    },
+    {
+      "event": "PostToolUse",
+      "tool": "mcp__tether_fixture__echo_nonce"
+    },
+    {
+      "event": "PostToolUse",
+      "tool": "Edit"
+    },
+    {
+      "event": "PostToolUse",
+      "tool": "Bash"
+    },
+    {
+      "event": "PostToolUse",
+      "tool": "Write"
+    },
+    {
+      "event": "PostToolUse",
+      "tool": "Write"
+    }
+  ],
+  "nativeResumePassed": true,
+  "modelChanged": true,
+  "permissionDenial": {
+    "name": "native-permission-denial-and-grep",
+    "durationMs": 20646,
+    "exitCode": 0,
+    "tools": [
+      "Grep",
+      "Read",
+      "Edit"
+    ],
+    "deniedTools": [
+      "Edit"
+    ],
+    "fileUnchanged": true,
+    "resultSubtype": "success"
+  },
+  "nativeTui": {
+    "officialTuiStarted": true,
+    "proBadge": true,
+    "modelMenuOpened": true,
+    "opusSelected": true,
+    "sonnetRestored": true,
+    "versionGatesOpus55": true,
+    "nativeEscapeCancelledBash": true,
+    "interruptShown": true,
+    "postCancelReplyObserved": true,
+    "normalExitCode": 0
+  },
+  "network": {
+    "tests": [
+      {
+        "name": "vps-egress",
+        "matched": true,
+        "tlsVerified": true,
+        "ms": 3111
+      },
+      {
+        "name": "api-baseline",
+        "round": 0,
+        "status": 405,
+        "tlsVerified": true,
+        "ms": 3182
+      },
+      {
+        "name": "after-ssh-interruption",
+        "round": 1,
+        "status": 405,
+        "tlsVerified": true,
+        "ms": 4270
+      },
+      {
+        "name": "after-ssh-interruption",
+        "round": 2,
+        "status": 405,
+        "tlsVerified": true,
+        "ms": 4757
+      },
+      {
+        "name": "after-ssh-interruption",
+        "round": 3,
+        "status": 405,
+        "tlsVerified": true,
+        "ms": 7940
+      }
+    ],
+    "noTransportReplay": true,
+    "sshProcesses": 4,
+    "stableProxyAddress": true,
+    "childrenReaped": true
+  },
+  "socketObservation": {
+    "resume-and-model-switch.connect.trace": {
+      "connectionAttempts": {
+        "loopback": 56,
+        "vps_ssh": 1
+      },
+      "unexpectedExternalCount": 0
+    },
+    "tools-and-context.connect.trace": {
+      "connectionAttempts": {
+        "loopback": 69,
+        "vps_ssh": 1
+      },
+      "unexpectedExternalCount": 0
+    }
+  },
+  "settingsOverrideProbe": {
+    "name": "official-cli-settings-override",
+    "claudeVersion": "2.1.267",
+    "exitCode": 143,
+    "settingsOverrideLauncherProxy": true,
+    "settingsOverrideNoProxy": true,
+    "syntheticOriginOnly": true
+  },
+  "limits": [
+    "Short validation only; no long-duration reliability claim",
+    "Interrupted model streams were not tested through an SSH outage",
+    "Claude settings can override proxy environment",
+    "No ccproxy integration, identity masking or account-ban guarantee",
+    "Windows native and macOS untested",
+    "The model picker gated Opus 5.5 on a newer official CLI"
+  ],
+  "settingsRouteProbe": [
+    {
+      "case": "settings-alternate-proxy",
+      "httpsOriginRequests": 1,
+      "alternateProxyConnects": 1
+    },
+    {
+      "case": "settings-no-proxy-star",
+      "httpsOriginRequests": 1,
+      "alternateProxyConnects": 0
+    }
+  ]
+}

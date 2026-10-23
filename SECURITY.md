@@ -10,6 +10,12 @@ Include the affected version, operating system, a minimal reproduction using dis
 
 ## Boundaries
 
-The local proxy binds only to loopback. OpenSSH authenticates the server and user; TLS remains end to end. Tether does not store Claude or SSH credentials, bypass host/certificate checks, replay requests, or expose a public proxy.
+The default Linux/WSL isolated mode has no external IP route. Ordinary Claude descendants cannot regain direct IP egress by changing proxy settings. Proxy-unaware traffic is blocked. Explicit `--network proxy` mode only supplies environment variables and can be bypassed by settings. See [network boundaries](docs/NETWORK.md).
+
+Local TCP listeners bind only to loopback, and namespace bridges use a private temporary directory. OpenSSH authenticates the server and user; HTTPS remains end to end on the default transport. Ordinary HTTP is plaintext at its destination. Tether does not store Claude or SSH credentials, bypass host/certificate checks, replay requests, or expose a public proxy.
 
 Local processes that can reach the loopback listener may use its tunnel while it is running. Tether is intended for a trusted single-user machine, not as an isolation boundary between untrusted local users. A VPS operator can observe connection metadata and destinations; TLS content is not decrypted by Tether.
+
+The filesystem remains accessible to Claude. Filesystem Unix sockets, cooperating host programs and privileged processes are outside the IP egress guarantee. This is not a hostile-code sandbox or an identity mask. No account-safety guarantee is provided.
+
+Enabling the experimental ccproxy connector sends authorization and plaintext API content to that separately trusted gateway. Current upstream key-log, capture and listener concerns are documented in [CCPROXY.md](docs/CCPROXY.md); synthetic compatibility tests do not establish suitability for real account credentials.

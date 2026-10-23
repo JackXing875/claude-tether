@@ -1,5 +1,5 @@
 import { once } from 'node:events';
-import { createServer } from 'node:http';
+import { Agent, createServer, request, type IncomingHttpHeaders } from 'node:http';
 import { createConnection, type Socket } from 'node:net';
 
 // Paused reads preserve bytes arriving alongside the final SOCKS reply.
@@ -61,10 +61,55 @@ export async function connectSocks(socksPort: number, host: string, port: number
 
 export type Dial = (host: string, port: number, signal: AbortSignal) => Promise<Socket>;
 
+function forwardedHeaders(headers: IncomingHttpHeaders): IncomingHttpHeaders {
+  const result = { ...headers };
+  const hopHeaders = ['connection', 'proxy-connection', 'keep-alive', 'proxy-authenticate',
+    'proxy-authorization', 'te', 'trailer', 'transfer-encoding', 'upgrade',
+    ...(headers.connection ?? '').split(',').map(value => value.trim().toLowerCase())];
+  for (const key of hopHeaders) delete result[key];
+  return result;
+}
+
 export async function startProxy(dial: Dial) {
   const sockets = new Set<Socket>();
-  const server = createServer({ maxHeaderSize: 8192, headersTimeout: 15_000, requestTimeout: 15_000 }, (_req, res) => {
-    res.writeHead(405, { Connection: 'close' }).end('HTTPS CONNECT required\n');
+  const server = createServer({ maxHeaderSize: 8192, headersTimeout: 15_000, requestTimeout: 0 }, (req, res) => {
+    let target: URL;
+    try {
+      target = new URL(req.url ?? '');
+      if (target.protocol !== 'http:' || target.username || target.password || target.hash) throw new Error();
+    } catch {
+      res.writeHead(400, { Connection: 'close' }).end('Absolute HTTP URL or HTTPS CONNECT required\n');
+      return;
+    }
+    const controller = new AbortController();
+    res.once('close', () => controller.abort());
+    req.once('aborted', () => controller.abort());
+    void (async () => {
+      let agent: Agent | undefined;
+      try {
+        const socket = await dial(target.hostname.replace(/^\[|\]$/g, ''), Number(target.port || 80), controller.signal);
+        if (controller.signal.aborted) { socket.destroy(); return; }
+        sockets.add(socket);
+        socket.once('close', () => sockets.delete(socket));
+        agent = new Agent({ keepAlive: false });
+        agent.createConnection = () => socket;
+        const upstream = request(target, { method: req.method, agent, signal: controller.signal,
+          headers: { ...forwardedHeaders(req.headers), host: target.host } }, response => {
+          res.writeHead(response.statusCode!, forwardedHeaders(response.headers));
+          response.on('error', () => res.destroy());
+          response.pipe(res);
+        });
+        upstream.on('error', () => {
+          if (!res.headersSent) res.writeHead(502, { Connection: 'close' }).end();
+          else res.destroy();
+        });
+        res.once('close', () => agent?.destroy());
+        req.pipe(upstream);
+      } catch {
+        agent?.destroy();
+        if (!res.destroyed) res.writeHead(502, { Connection: 'close' }).end();
+      }
+    })();
   });
   server.maxConnections = 128;
   server.on('connection', socket => {

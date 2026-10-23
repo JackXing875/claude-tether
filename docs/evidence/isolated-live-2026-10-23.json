@@ -1,0 +1,170 @@
+{
+  "date": "2026-10-23",
+  "version": "0.3.0-beta.1",
+  "baseCommit": "27ddf6309ede32eb5a71304ab46346d6c488d94c",
+  "runtime": {
+    "platform": "Ubuntu 24.04 WSL2 x64",
+    "node": "24.14.0",
+    "bubblewrap": "0.9.0",
+    "claude": "2.1.267"
+  },
+  "auth": {
+    "method": "claude.ai",
+    "subscription": "pro",
+    "credentialsCopied": false
+  },
+  "realModelTests": [
+    {
+      "name": "tools-and-context",
+      "exitCode": 0,
+      "durationMs": 58787,
+      "firstTextMs": 31573,
+      "streamEvents": 129,
+      "models": [
+        "claude-sonnet-5"
+      ],
+      "tools": [
+        "Glob",
+        "ToolSearch",
+        "Read",
+        "Read",
+        "mcp__tether_fixture__echo_nonce",
+        "Edit",
+        "Bash"
+      ],
+      "resultSubtype": "success",
+      "isError": false,
+      "sessionMatches": true
+    },
+    {
+      "name": "resume-and-model-switch",
+      "exitCode": 0,
+      "durationMs": 17257,
+      "firstTextMs": 15385,
+      "streamEvents": 11,
+      "models": [
+        "claude-opus-5"
+      ],
+      "tools": [],
+      "resultSubtype": "success",
+      "isError": false,
+      "sessionMatches": true
+    }
+  ],
+  "projectContextLoaded": true,
+  "mcpFreshChallenge": true,
+  "projectTestsPassed": true,
+  "nativeResumePassed": true,
+  "modelChanged": true,
+  "hookEvents": [
+    {
+      "event": "SessionStart"
+    },
+    {
+      "event": "PostToolUse",
+      "tool": "Glob"
+    },
+    {
+      "event": "PostToolUse",
+      "tool": "ToolSearch"
+    },
+    {
+      "event": "PostToolUse",
+      "tool": "Read"
+    },
+    {
+      "event": "PostToolUse",
+      "tool": "Read"
+    },
+    {
+      "event": "PostToolUse",
+      "tool": "mcp__tether_fixture__echo_nonce"
+    },
+    {
+      "event": "PostToolUse",
+      "tool": "Edit"
+    },
+    {
+      "event": "PostToolUse",
+      "tool": "Bash"
+    }
+  ],
+  "tui": {
+    "nativeModelMenu": true,
+    "exitCode": 0,
+    "signal": null
+  },
+  "routeOverride": [
+    {
+      "case": "settings-alternate-proxy",
+      "httpsOriginRequests": 0,
+      "alternateProxyConnects": 0
+    },
+    {
+      "case": "settings-no-proxy-star",
+      "httpsOriginRequests": 0,
+      "alternateProxyConnects": 0
+    }
+  ],
+  "networkTrace": [
+    {
+      "name": "tools-and-context",
+      "loopbackConnections": 76,
+      "externalConnectAttempts": 1,
+      "distinctExternalDestinations": 1
+    },
+    {
+      "name": "resume-and-model-switch",
+      "loopbackConnections": 69,
+      "externalConnectAttempts": 1,
+      "distinctExternalDestinations": 1
+    }
+  ],
+  "ccproxySynthetic": {
+    "upstream": "f2c47695b0835da023257aee0ac2a3dffd9fe570",
+    "syntheticCredentialsOnly": true,
+    "results": [
+      {
+        "model": "sonnet-test",
+        "status": 200,
+        "preserved": true
+      },
+      {
+        "model": "opus-test",
+        "status": 200,
+        "preserved": true
+      },
+      {
+        "model": "count-test",
+        "status": 200,
+        "preserved": true
+      },
+      {
+        "model": "error-test",
+        "status": 429,
+        "preserved": true
+      }
+    ],
+    "passed": true,
+    "createdFiles": [
+      ".inspector-wireguard-client.conf",
+      "ccproxy.yaml",
+      "certs",
+      "tls.keylog",
+      "wg.keylog"
+    ]
+  },
+  "automatedTests": {
+    "passed": 29,
+    "failed": 0,
+    "cancelled": 0,
+    "skipped": 0
+  },
+  "limitations": [
+    "Not a transparent system-wide VPN; proxy-unaware external IP traffic blocked",
+    "Not a hostile-code sandbox; filesystem Unix sockets and cooperating host programs outside boundary",
+    "No real Pro through ccproxy; not installed on VPS",
+    "No identity spoofing or account-ban immunity",
+    "No long-duration or interrupted active model-stream acceptance test"
+  ]
+}

@@ -1,6 +1,6 @@
 # Architecture and development notes
 
-Claude Tether runs the official Claude Code CLI locally and uses an SSH-accessible VPS as the HTTPS network exit. The application should remain small enough to understand without a framework or a service deployment.
+Claude Tether runs the official Claude Code CLI locally and uses an SSH-accessible VPS as the HTTP(S) network exit. The application should remain small enough to understand without a framework or a service deployment.
 
 ## Responsibilities
 
@@ -10,10 +10,12 @@ Claude Tether runs the official Claude Code CLI locally and uses an SSH-accessib
 | `src/cli.ts` | Local | Commands, executable checks, process environment and lifecycle |
 | `src/settings.ts` | Local | Small, atomic preferences file; no credentials |
 | `src/tunnel.ts` | Local | OpenSSH lifecycle, readiness, keepalives and bounded reconnect backoff |
-| `src/proxy.ts` | Local | Loopback HTTPS CONNECT to SOCKS5, remote DNS and byte streams |
+| `src/proxy.ts` | Local | HTTP and HTTPS CONNECT to SOCKS5, remote DNS and byte streams |
+| `src/isolation.ts`, `src/isolated-child.ts` | Local | Linux network/PID namespaces, native CLI lifecycle |
+| `src/bridge.ts` | Local | Bounded Unix/TCP bridges across the network namespace; optional gateway |
 | OpenSSH sshd | VPS | SSH authentication and outbound TCP forwarding |
 
-There is no custom VPS daemon, remote agent, tool bridge, database, model gateway, or credential service. The official CLI remains responsible for project behavior and model request semantics.
+The default path has no custom VPS daemon, remote agent, tool bridge, database or credential service. An optional, separately installed ccproxy gateway is experimental and disabled by default. The official CLI remains responsible for project behavior and model request semantics.
 
 ## Design rules
 
@@ -34,7 +36,11 @@ Read README and the operations guide, then run `npm ci`, `npm test` and `npm run
 
 Transport tests must exercise actual sockets, OpenSSH, TLS, cancellation, fragmentation, backpressure and recovery. CLI substitutes validate process contracts only; they are not evidence of live Claude compatibility. Keep the validation boundaries in `docs/TEST-REPORT.md` current.
 
-The next external validation is a user's real VPS and official Claude account: complete a streamed request and a small local project task, then inspect behavior during a short outage and extended use. Do not report these checks as complete based on local fixtures.
+The first real VPS/Pro validation is recorded in `docs/LIVE-TEST-REPORT.md`: streamed requests, local project tools, MCP/hooks, model selection and native resume were exercised. New HTTPS connections recovered after three controlled SSH interruptions. Extended use and recovery of an active model turn during an outage remain separate validation work. Do not infer those results from local fixtures or successful short requests.
+
+The default isolated mode enforces an IP egress boundary with rootless bubblewrap, a loopback-only network namespace and private Unix bridges. Settings may still override proxy variables, but cannot restore direct IP egress. Proxy-unaware traffic is blocked, not transparently converted. Compatibility mode is explicitly opt-in. This is not a hostile-code filesystem sandbox or identity mask; see `docs/NETWORK.md`.
+
+The optional ccproxy connector tunnels a VPS loopback port and preserves the official client's request semantics. It does not inject credentials or implement request shaping. The audited upstream writes TLS key logs, retains request content and disables upstream TLS verification by default; synthetic tests are not approval for personal Pro use. See `docs/CCPROXY.md`.
 
 ## Earlier architecture
 

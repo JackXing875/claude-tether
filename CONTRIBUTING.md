@@ -7,7 +7,7 @@ Claude Tether is an early beta focused on a small, dependable launch and transpo
 Use Node.js from `.nvmrc`. On Ubuntu/Debian, integration tests also need:
 
 ```bash
-sudo apt-get install openssh-client openssh-server openssl
+sudo apt-get install openssh-client openssh-server openssl bubblewrap
 sudo mkdir -p /run/sshd
 npm ci
 npm test
@@ -27,7 +27,9 @@ Describe the problem, changed behavior and relevant validation. Keep source, doc
 
 1. Update `package.json`, the lockfile, `CHANGELOG.md` and `docs/releases/<tag>.md`.
 2. Run the tests, package installation check and dependency audit.
-3. Commit the release and push a matching `vX.Y.Z-beta.N` tag.
+3. Merge the validated version change into `main`. A `package.json` change triggers the release workflow, which creates a matching `vX.Y.Z-beta.N` tag only after validation. Tag pushes and manual dispatch on `main` are also supported.
+
+The disposable GitHub runner enables unprivileged user namespaces for isolation tests; this does not change a user machine's policy.
 
 The release workflow checks that the tag matches the package version, repeats validation, creates a prebuilt npm tarball and SHA-256 manifest, and publishes a GitHub prerelease. It does not publish to npm. Release tags should not be moved or reused; fixes belong in the next beta.
 
