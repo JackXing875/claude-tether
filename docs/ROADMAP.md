@@ -12,18 +12,16 @@ The project is a development alpha. “Open-source engineering foundation” and
 - Contribution/security/release instructions and issue/PR templates.
 - GitHub workflow results must be checked for the actual proposed commit, not inferred from local tests.
 
-## Real Claude integration — next gate
+## Real Claude integration — controlled alpha verified
 
-This gate requires the owner's official subscription login on the dedicated VPS account. No credentials should be pasted into issues, chat, CI or git.
+The owner's official Pro login and the pinned 2.1.267 VPS-to-WSL path passed the [live acceptance](LIVE-TEST-REPORT.md). Public `--runtime claude`, managed SSH transport and a dedicated-user systemd template are available. No credentials belong in issues, chat, CI or git.
 
-- Record the pinned official CLI's initialization, stream, tool and terminal behavior using the existing two-turn probe.
-- Candidate authenticated per-turn MCP-to-supervisor IPC is implemented and tested with a synthetic CLI and real MCP subprocess. Verify the same boundary with official Claude before enabling the public runtime.
-- Runtime session mapping and explicit resume survive restart in synthetic subprocess tests. Confirm the pinned official CLI uses the same intended conversation and transcript semantics.
-- Verify a real model reads, edits and tests only the local project; confirm remote built-in tools remain unavailable.
-- Test denial, disconnect during tool execution, cancellation and restart without duplicated effects.
-- Measure real CLI memory/latency on the VPS. The previously inspected ~1 GiB server is below Claude's documented 4 GiB baseline; the offline transport result is not evidence of real-runtime capacity.
+- Completed the two-turn fresh MCP challenge and explicit conversation recall.
+- Verified official CLI → MCP → relay → local read/search/edit/test, with a checked tool allowlist and no remote project copy.
+- Verified service restart/resume, denial, edit conflict, cancellation, disconnect cleanup, reconciliation and command deduplication.
+- Recorded observed text latency and memory; long-context/long-duration capacity remains untested.
 
-Do not enable `--runtime claude`, publish a stable release or describe the system as production-ready before these checks pass. Mock fixtures validate contracts, not the current official CLI or subscription entitlement.
+The report retains a transient reconnect failure and distinguishes synthetic fixtures from official results. Stable publication still requires wider use, resource/upgrade tests and the beta work below.
 
 ## Daily-use beta
 

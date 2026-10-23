@@ -65,6 +65,9 @@ void test('CLI rejects implicit runtime and malformed ports before creating stat
     ['server'],
     ['server', '--runtime', 'fake', '--port', 'NaN'],
     ['server', '--runtime', 'fake', '--port', '65536'],
+    ['server', '--runtime', 'fake', '--claude', '/unused'],
+    ['server', '--runtime', 'claude', '--turn-timeout-ms', '0'],
+    ['server', '--runtime', 'claude', '--turn-timeout-ms', '600001'],
   ]) {
     const result = f.run(...args);
     assert.equal(result.status, 1);
@@ -178,5 +181,104 @@ void test('separate CLI processes connect, resume, deny unattended mutations, an
   const [code] = await closed;
   stopped = true;
   assert.equal(code, 0);
+  assert.equal(f.run('device', 'revoke', '--id', 'anything').status, 0);
+});
+
+void test('public Claude server and managed SSH preserve session discovery across local tunnel ports', async (t) => {
+  const f = setup(t);
+  const credential = join(f.base, 'credentials', 'device.json');
+  assert.equal(f.run('device', 'create', '--out', credential).status, 0);
+  writeFileSync(join(f.project, 'calc.mjs'), 'export const marker = "client-file";\n');
+  const claude = join(f.base, 'synthetic-claude.mjs');
+  const ssh = join(f.base, 'synthetic-ssh.mjs');
+  for (const [path, fixture] of [
+    [claude, 'claude-cli'],
+    [ssh, 'ssh'],
+  ]) {
+    writeFileSync(
+      path!,
+      '#!/usr/bin/env node\nawait import(' +
+        JSON.stringify(new URL('./fixtures/' + fixture + '.js', import.meta.url).href) +
+        ');\n',
+      { mode: 0o700 },
+    );
+  }
+  const child = spawn(
+    process.execPath,
+    [
+      cli,
+      'server',
+      '--runtime',
+      'claude',
+      '--claude',
+      claude,
+      '--port',
+      '0',
+      '--turn-timeout-ms',
+      '2000',
+    ],
+    {
+      cwd: f.project,
+      env: { ...f.env, HOME: f.base },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  );
+  child.stderr.resume();
+  const closed = once(child, 'close');
+  let stopped = false;
+  t.after(async () => {
+    if (!stopped) {
+      child.kill('SIGKILL');
+      await closed;
+    }
+  });
+  const port = await new Promise<string>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Server startup timed out')), 10000);
+    let text = '';
+    child.stdout.on('data', (chunk: Buffer) => {
+      text += chunk.toString();
+      const match = /Listening: ws:\/\/127\.0\.0\.1:(\d+)/.exec(text);
+      if (match) {
+        clearTimeout(timer);
+        resolve(match[1]!);
+      }
+    });
+    child.once('exit', () => {
+      clearTimeout(timer);
+      reject(new Error('Server exited'));
+    });
+  });
+  const options = [
+    '--credential',
+    credential,
+    '--ssh',
+    'test-vps',
+    '--ssh-command',
+    ssh,
+    '--relay-port',
+    port,
+  ];
+  const initial = f.run('sessions', ...options, '--json');
+  assert.equal(initial.status, 0, initial.stderr);
+  assert.deepEqual(JSON.parse(initial.stdout), []);
+  const read = f.run('connect', ...options, '--prompt', 'read calc.mjs');
+  assert.equal(read.status, 0, read.stderr);
+  assert.match(read.stdout, /Runtime: claude/);
+  assert.match(read.stdout, /client-file/);
+  const session = /Session: ([a-z0-9-]+)/.exec(read.stdout)![1]!;
+  const list = f.run('sessions', ...options, '--json');
+  assert.equal(list.status, 0, list.stderr);
+  assert.equal((JSON.parse(list.stdout) as SessionSummary[])[0]!.session_id, session);
+  const resumed = f.run('connect', ...options, '--resume', session, '--prompt', 'read calc.mjs');
+  assert.equal(resumed.status, 0, resumed.stderr);
+  assert.match(resumed.stdout, /client-file/);
+  const states = join(f.env.XDG_STATE_HOME, 'claude-tether', 'workspaces');
+  assert.equal(readdirSync(states).length, 1, 'ephemeral TCP ports do not create new identities');
+  const timedOut = f.run('connect', ...options, '--resume', session, '--prompt', 'hang');
+  assert.equal(timedOut.status, 1, timedOut.stderr);
+  assert.match(timedOut.stdout, /RUNTIME_TIMEOUT/);
+  child.kill('SIGTERM');
+  assert.equal((await closed)[0], 0);
+  stopped = true;
   assert.equal(f.run('device', 'revoke', '--id', 'anything').status, 0);
 });

@@ -7,7 +7,7 @@ Run the Claude Code agent on your VPS while keeping project tools and approval o
 
 [中文](README.zh-CN.md) · [Quick start](docs/QUICKSTART.md) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md)
 
-**Development alpha.** The working end-to-end path currently uses an offline, deterministic agent. The candidate official CLI supervisor, MCP subprocess bridge and subscription probe exist, but official account behavior has not been verified; the public CLI still only enables the fake runtime. See the [release gates](docs/ROADMAP.md). This is an independent project, not affiliated with Anthropic.
+**Development alpha.** The official Claude Code 2.1.267 / Pro path has passed a live VPS-to-WSL acceptance run: local read/search/edit/test, streamed text, explicit resume after service restart, denial, conflict, cancellation and disconnect recovery. Enable it with `tether server --runtime claude`; `tether connect --ssh YOUR_ALIAS` manages the encrypted connection. See the [live evidence and limits](docs/LIVE-TEST-REPORT.md). This is an independent project, not affiliated with Anthropic.
 
 ## Try it in two minutes
 

@@ -12,28 +12,28 @@ import {
 import { LocalTools } from '../../packages/local-tools/index.js';
 import { BridgeError } from '../../packages/protocol/index.js';
 import type { SessionSummary } from '../../packages/protocol/index.js';
+import { connectionArgs, connectionPlan } from './connection.js';
 
 export async function runSessions(args: string[]): Promise<void> {
   const { values } = parseArgs({
     args,
     options: {
+      ...connectionArgs,
       credential: { type: 'string' },
       config: { type: 'string' },
       state: { type: 'string' },
       workspace: { type: 'string', default: process.cwd() },
-      url: { type: 'string' },
-      ca: { type: 'string' },
-      'allow-insecure-loopback': { type: 'boolean', default: false },
       'read-only': { type: 'boolean', default: false },
       json: { type: 'boolean', default: false },
     },
   });
   const credentialPath = values.credential ?? values.config;
-  if (!credentialPath || !values.url)
+  if (!credentialPath)
     throw new BridgeError(
       'USAGE',
-      'Required: --credential <device.json> --url <bridge-url>. Run tether sessions --help.',
+      'Required: --credential <device.json>. Run tether sessions --help.',
     );
+  const connection = connectionPlan(values);
   const credentials = readCredential(credentialPath);
   const tools = new LocalTools(values.workspace);
   const policy = values['read-only'] ? 'read-only' : 'ask';
@@ -65,7 +65,7 @@ export async function runSessions(args: string[]): Promise<void> {
   let state: string;
   try {
     state = validatePrivateDirectory(
-      values.state ?? clientState(tools.root, credentials.device_id, values.url, policy),
+      values.state ?? clientState(tools.root, credentials.device_id, connection.stateKey, policy),
     );
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
@@ -83,13 +83,18 @@ export async function runSessions(args: string[]): Promise<void> {
     print([]);
     return;
   }
-  print(
-    await BridgeClient.listSessions({
-      url: values.url,
-      token: credentials.token,
-      workspace,
-      allowInsecureLoopback: values['allow-insecure-loopback'],
-      ca: values.ca ? readFileSync(values.ca) : undefined,
-    }),
-  );
+  const transport = await connection.open();
+  try {
+    print(
+      await BridgeClient.listSessions({
+        url: transport.url,
+        token: credentials.token,
+        workspace,
+        allowInsecureLoopback: transport.allowInsecureLoopback,
+        ca: values.ca ? readFileSync(values.ca) : undefined,
+      }),
+    );
+  } finally {
+    await transport.close();
+  }
 }

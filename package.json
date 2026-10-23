@@ -73,6 +73,7 @@
     "README.zh-CN.md",
     "docs/",
     "examples/",
+    "deploy/",
     "LICENSE",
     "CHANGELOG.md",
     "CONTRIBUTING.md",

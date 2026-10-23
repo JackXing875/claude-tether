@@ -2,7 +2,7 @@
 
 The supported environment is Linux or WSL2, Node 24.14+ within 24.x, npm, and ripgrep. For Ubuntu/WSL, install ripgrep with `sudo apt-get install ripgrep`. Test contributors also need `openssl`. If you already use nvm, `nvm install && nvm use` reads the checked-in version. See [compatibility](COMPATIBILITY.md) for unverified platforms.
 
-All commands below are for a development alpha with the **fake runtime**. No model requests occur. Keep the official Claude login on the VPS when the real-runtime gate is ready.
+Steps 1–3 use the **fake runtime** and issue no model requests. Step 4 enables the verified official Claude / Pro path and consumes subscription allowance. Keep the official Claude login on the VPS.
 
 ## 1. Run the disposable demo
 
@@ -74,31 +74,67 @@ The list shows the latest turn state, whether a client is attached, and unresolv
 
 For a single unattended read, append `--prompt 'read calc.mjs'`. Without an interactive terminal, all mutations are denied. `--read-only` also denies all commands, including commands described as reads. An UNKNOWN operation requires inspection; restarting or inventing a new operation ID is not a recovery procedure.
 
-## 4. Use your VPS over SSH
+## 4. Connect to real Claude on your VPS
 
-Install the same package and supported Node runtime on your own server. Run the relay as a dedicated non-root user and keep its state private. Provision the device **on that server**, then copy only its device JSON to a private client path using SCP and set `chmod 600`. Do not copy a Claude subscription token to the client.
+Install the same tested tarball and supported Node runtime on both ends. On the VPS, use the dedicated non-root account prepared by `deploy/bootstrap-vps.sh`; complete [official subscription login](AUTH.md) as that account. Run `tether doctor --json` and the explicit two-turn `tether probe --cwd "$HOME/probe/session" --claude "$HOME/.local/bin/claude"` before serving your device.
 
-Run `tether server --runtime fake` on the server, then open a tunnel on the client:
+As the dedicated VPS account, with the relay stopped:
 
 ```bash
-ssh -N -L 8787:127.0.0.1:8787 YOUR_SSH_ALIAS
+tether device create --id laptop --state "$HOME/tether/relay.sqlite" \
+  --out "$HOME/tether/laptop.json"
+tether server --runtime claude --state "$HOME/tether/relay.sqlite" \
+  --claude "$HOME/.local/bin/claude"
 ```
 
-Use the same loopback URL as step 3. The relay requires no public listening port. If using direct WSS, configure `--cert` and `--key`, and use `--ca` for your own certificate authority; certificate verification is never disabled. See [RUNBOOK.md](RUNBOOK.md) for lifecycle and troubleshooting.
+The default listener is `127.0.0.1:8787`; no public port is required. The default turn deadline is 120 seconds (`--turn-timeout-ms` accepts up to 600000). Store runtime state beside the relay database; keep it for explicit session recovery. For persistent operation and boot startup, use the [systemd instructions](RUNBOOK.md#systemd-常驻服务) instead of a foreground server.
+
+Copy **only the newly provisioned device JSON** from the server to a private client path, for example `$HOME/.local/state/claude-tether/laptop.json`, with directory mode 700 and file mode 600. Keep the Claude subscription credential on the VPS. Configure key/agent authentication and verify the host key in your usual OpenSSH config first; the managed transport requires this and does not prompt for passwords.
+
+From any client project directory:
+
+```bash
+tether connect --credential "$HOME/.local/state/claude-tether/laptop.json" --ssh YOUR_SSH_ALIAS
+```
+
+This command starts and closes its own SSH connection; you do not need a second SSH terminal. Approve each local diff or command with `y`; `/quit` exits and Ctrl-C cancels the active task. Ordinary commands execute with your local account permissions. There is no automatic reconnection or task replay after a lost connection.
+
+If your SSH alias/key is configured in **Windows OpenSSH** and the client runs in WSL, append:
+
+```bash
+--ssh-command /mnt/c/Windows/System32/OpenSSH/ssh.exe
+```
+
+No private key is copied into WSL. Use `--relay-port` if the remote relay listens on a port other than 8787; the SSH server port/user are taken from your SSH config.
+
+Discover and explicitly resume a session using the same connection options:
+
+```bash
+tether sessions --credential "$HOME/.local/state/claude-tether/laptop.json" --ssh YOUR_SSH_ALIAS
+tether connect --credential "$HOME/.local/state/claude-tether/laptop.json" \
+  --ssh YOUR_SSH_ALIAS --resume SESSION_ID
+```
+
+Keep the alias, remote relay port, device, workspace, policy and any explicit `--state` unchanged. State uses the stable SSH destination, never the temporary local TCP port. Changing between `--ssh` and a direct `--url` selects a different default client state; preserve the original connection identity for recovery.
+
+Direct WSS remains available using `--url` and optionally `--ca`. Existing manually managed tunnels still work with `--url ws://127.0.0.1:8787/v1/bridge --allow-insecure-loopback`; these options cannot be combined with `--ssh`.
 
 ## Troubleshooting
 
-| Symptom                                        | Action                                                                                           |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Unsupported Node version                       | Use `.nvmrc` or a supported Node 24.x version; restart the shell after changing PATH             |
-| `rg` is missing                                | Install ripgrep on the client; the VPS does not search project files                             |
-| `STATE_IN_USE`                                 | Stop the other process using that database; do not delete its lease file                         |
-| `STATE_PERMISSIONS` / `CREDENTIAL_PERMISSIONS` | Use a private state directory (`700`) and regular credential file (`600`)                        |
-| `ECONNREFUSED`                                 | Check that the relay and, if applicable, SSH tunnel are running                                  |
-| `TLS_REQUIRED`                                 | Use WSS, or explicitly enable a numeric loopback URL for a tunnel/demo                           |
-| `WORKSPACE_MISMATCH`                           | Restore the original project/device/state; do not reuse identity files for a different directory |
-| `OUTCOME_UNKNOWN`                              | Inspect local effects and journal evidence before further writes; see the runbook                |
-| `METHOD_NOT_FOUND` from `sessions`             | Upgrade the relay and client together; early prototypes do not implement session discovery       |
-| Claude is absent in `doctor`                   | Expected on a client and allowed for the offline demo                                            |
+| Symptom                                        | Action                                                                                                                                             |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unsupported Node version                       | Use `.nvmrc` or a supported Node 24.x version; restart the shell after changing PATH                                                               |
+| `rg` is missing                                | Install ripgrep on the client; the VPS does not search project files                                                                               |
+| `STATE_IN_USE`                                 | Stop the other process using that database; do not delete its lease file                                                                           |
+| `STATE_PERMISSIONS` / `CREDENTIAL_PERMISSIONS` | Use a private state directory (`700`) and regular credential file (`600`)                                                                          |
+| `ECONNREFUSED`                                 | Check that the relay and, if applicable, SSH tunnel are running                                                                                    |
+| `ECONNRESET` with `--ssh`                      | Check that the server is running and the chosen SSH executable can authenticate with a trusted host key; reconnect the original session explicitly |
+| `AUTH_REQUIRED`                                | Complete official subscription login as the VPS service account; client login is unrelated                                                         |
+| `RUNTIME_VERSION`                              | Restore the verified official CLI version; validate upgrades before changing the pin                                                               |
+| `TLS_REQUIRED`                                 | Use WSS, or explicitly enable a numeric loopback URL for a tunnel/demo                                                                             |
+| `WORKSPACE_MISMATCH`                           | Restore the original project/device/state; do not reuse identity files for a different directory                                                   |
+| `OUTCOME_UNKNOWN`                              | Inspect local effects and journal evidence before further writes; see the runbook                                                                  |
+| `METHOD_NOT_FOUND` from `sessions`             | Upgrade the relay and client together; early prototypes do not implement session discovery                                                         |
+| Claude is absent in `doctor`                   | Expected on a client and allowed for the offline demo                                                                                              |
 
 `tether doctor --json` produces an allowlisted diagnostic summary. It never calls the model and does not establish subscription compatibility. Never attach raw state databases or credentials to issues.

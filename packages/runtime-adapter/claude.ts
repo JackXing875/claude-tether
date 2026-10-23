@@ -98,7 +98,7 @@ export type RuntimeEvent =
   | { type: 'result'; session_id: string; success: boolean }
   | { type: 'unknown'; event_type: string };
 
-/** Synthetic-fixture contract until recorded VPS events pass P0. */
+/** Pinned CLI stream contract, checked by synthetic tests and the explicit live probe. */
 export class ClaudeEventDecoder {
   private buffer = '';
   private decoder = new StringDecoder('utf8');

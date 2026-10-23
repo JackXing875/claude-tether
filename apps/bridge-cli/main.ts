@@ -7,6 +7,7 @@ import { terminalText } from '../../packages/diagnostics/index.js';
 import { LocalHost } from '../../packages/local-host/index.js';
 import { BridgeClient } from '../../packages/client/index.js';
 import { BridgeError, failure } from '../../packages/protocol/index.js';
+import { connectionArgs, connectionPlan } from '../cli/connection.js';
 import {
   assertOutsideWorkspace,
   clientState,
@@ -19,24 +20,23 @@ export async function runClient(args: string[]): Promise<void> {
   const { values } = parseArgs({
     args,
     options: {
+      ...connectionArgs,
       credential: { type: 'string' },
       config: { type: 'string' },
       state: { type: 'string' },
       workspace: { type: 'string', default: process.cwd() },
-      url: { type: 'string' },
       resume: { type: 'string' },
-      ca: { type: 'string' },
       prompt: { type: 'string' },
-      'allow-insecure-loopback': { type: 'boolean', default: false },
       'read-only': { type: 'boolean', default: false },
     },
   });
   const credentialPath = values.credential ?? values.config;
-  if (!credentialPath || !values.url)
+  if (!credentialPath)
     throw new BridgeError(
       'USAGE',
-      'Required: --credential <device.json> --url <bridge-url>. Run tether connect --help.',
+      'Required: --credential <device.json>. Run tether connect --help.',
     );
+  const connection = connectionPlan(values);
   if (!process.stdin.isTTY && !values.prompt)
     throw new BridgeError(
       'USAGE',
@@ -46,17 +46,26 @@ export async function runClient(args: string[]): Promise<void> {
   const root = realpathSync(values.workspace);
   const policy = values['read-only'] ? 'read-only' : 'ask';
   const state = ensurePrivateDirectory(
-    values.state ?? clientState(root, credentials.device_id, values.url, policy),
+    values.state ?? clientState(root, credentials.device_id, connection.stateKey, policy),
   );
   assertOutsideWorkspace(root, state);
   const terminal = createInterface({ input: process.stdin, output: process.stdout });
   let host: LocalHost | undefined, client: BridgeClient | undefined, turnId: string | undefined;
+  let transport: Awaited<ReturnType<typeof connection.open>> | undefined;
+  let stopping = false;
   const interrupt = () => {
     if (client && turnId) void client.cancel(turnId).catch(() => {});
     else terminal.close();
   };
   terminal.on('SIGINT', interrupt);
   process.on('SIGINT', interrupt);
+  const terminate = () => {
+    stopping = true;
+    client?.close();
+    host?.cancelAll();
+    terminal.close();
+  };
+  process.once('SIGTERM', terminate);
   try {
     host = new LocalHost({
       root,
@@ -99,12 +108,14 @@ export async function runClient(args: string[]): Promise<void> {
       };
       writeFileSync(identityPath, JSON.stringify(identity), { mode: 0o600, flag: 'wx' });
     }
+    transport = await connection.open();
+    if (stopping) throw new BridgeError('CANCELLED', 'Client is stopping.');
     client = await BridgeClient.connect({
-      url: values.url,
+      url: transport.url,
       token: credentials.token,
       workspace: binding,
       host,
-      allowInsecureLoopback: values['allow-insecure-loopback'],
+      allowInsecureLoopback: transport.allowInsecureLoopback,
       ca: values.ca ? readFileSync(values.ca) : undefined,
       resumeSession: values.resume,
       onEvent: (event) => {
@@ -113,6 +124,7 @@ export async function runClient(args: string[]): Promise<void> {
         else console.log('\n[' + event.type + '] ' + terminalText(JSON.stringify(event.data)));
       },
     });
+    if (stopping) throw new BridgeError('CANCELLED', 'Client is stopping.');
     console.log(
       '\nRuntime: ' +
         client.runtime +
@@ -123,7 +135,8 @@ export async function runClient(args: string[]): Promise<void> {
       try {
         const receipt = await client!.submit(prompt);
         turnId = receipt.turn_id;
-        const event = await client!.waitTurn(turnId);
+        // Covers the server's configurable ten-minute deadline plus shutdown time.
+        const event = await client!.waitTurn(turnId, 615_000);
         if (event.type !== 'completed' && values.prompt) process.exitCode = 1;
       } finally {
         turnId = undefined;
@@ -159,7 +172,9 @@ export async function runClient(args: string[]): Promise<void> {
   } finally {
     client?.close();
     await host?.close();
+    await transport?.close();
     terminal.close();
     process.off('SIGINT', interrupt);
+    process.off('SIGTERM', terminate);
   }
 }

@@ -6,11 +6,11 @@
 
 VPS 已准备非 root 账号 claude-relay，其 HOME 为 /var/lib/claude-relay。官方 CLI 2.1.267 位于该账号的 .local/bin/claude。Node.js 独立安装在 /opt/personal-relay/runtime/node-v24.14.0-linux-x64，未替换系统 Node。
 
-用户选择稍后登录，因此本轮不发起真实模型请求。准备好后，从自己的终端登录 VPS，在专用账号中执行：
+2026-10-23 已完成一次真实 Pro 登录与模型验收，见 [测试报告](LIVE-TEST-REPORT.md)。新部署仍须由账号所有者从自己的终端登录 VPS，在专用账号中执行：
 
 ```bash
 su - claude-relay
-DISABLE_AUTOUPDATER=1 /var/lib/claude-relay/.local/bin/claude auth login
+DISABLE_AUTOUPDATER=1 /var/lib/claude-relay/.local/bin/claude auth login --claudeai
 ```
 
 在官方页面登录自己的 Pro/Max。授权码只输入官方 CLI 的终端，不写入聊天、项目配置或 Git。官方账号维护流程见 [认证文档](https://code.claude.com/docs/en/authentication)。
@@ -28,12 +28,12 @@ workerEnvironment 在启动模型进程前拒绝已知 API Key、网关/第三�
 ```bash
 PATH=/opt/personal-relay/runtime/node-v24.14.0-linux-x64/bin:$PATH \
 DISABLE_AUTOUPDATER=1 \
-node /opt/personal-relay/prototype/bin/tether.mjs probe \
+node /opt/personal-relay/current/lib/node_modules/claude-tether/bin/tether.mjs probe \
   --cwd /var/lib/claude-relay/probe/session \
   --claude /var/lib/claude-relay/.local/bin/claude
 ```
 
-上例要求先把当前包安装/更新到该位置；早期 VPS 副本不会自动更新。使用已安装 CLI 时也可直接运行 `tether probe --cwd 私有目录 --claude 官方可执行文件`。该探针最多发出两轮真实请求，可能占用订阅额度；要求官方状态为 claude.ai，拒绝其他认证路径。它不是完整中转站验收，也未覆盖持续 stdin、多轮中断和完整配置隔离。
+上例要求先把当前包安装/更新到该位置；早期 VPS 副本不会自动更新，`current` 指向已安装的版本目录。使用已安装 CLI 时也可直接运行 `tether probe --cwd 私有目录 --claude 官方可执行文件`。该探针最多发出两轮真实请求，可能占用订阅额度；要求官方状态为 claude.ai，拒绝其他认证路径。它不是完整中转站验收，也未覆盖持续 stdin、多轮中断和完整配置隔离。
 
 第一轮必须实际调用唯一的 `workspace_info` MCP 工具并返回本次随机生成的标记。第二轮必须沿用指定 UUID，在不调用工具的情况下回忆第一轮标记；新提示不会携带答案，工具中的标记也已更换。只返回成功状态、换成另一会话、重新调用工具或忘记标记都会失败，不能据此宣称恢复成功。标记可以跨多条文本事件到达；探针不把这一检查当作完整的流式延迟验收。
 

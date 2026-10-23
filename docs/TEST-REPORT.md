@@ -1,6 +1,6 @@
 # 首轮原型测试报告
 
-> 历史记录：以下为初始 0.1.0 原型的验证快照，不随功能改动改写。当前测试入口、CI 和安装验收见 [TESTING.md](TESTING.md)，现状见 [COMPATIBILITY.md](COMPATIBILITY.md)。
+> 历史记录：以下为初始 0.1.0 原型的验证快照，不随功能改动改写。后续真实 Claude 验收见 [LIVE-TEST-REPORT.md](LIVE-TEST-REPORT.md)。当前测试入口、CI 和安装验收见 [TESTING.md](TESTING.md)，现状见 [COMPATIBILITY.md](COMPATIBILITY.md)。
 
 日期：2026-10-23（Asia/Shanghai）。代码版本：0.1.0。测试区分本地执行、真实网络、模拟 Agent 与官方运行时；本报告不是第一版验收结论。
 

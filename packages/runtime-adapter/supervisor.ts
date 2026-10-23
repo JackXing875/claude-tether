@@ -17,7 +17,7 @@ export interface ClaudeRuntimeOptions {
   timeoutMs?: number;
 }
 
-/** Candidate official CLI supervisor. Not exposed by the public CLI until the real P0 gate passes. */
+/** Official CLI supervisor with explicit conversation identity and locally authorized tools. */
 export class ClaudeRuntime implements AgentRuntime {
   readonly kind = 'claude' as const;
   private readonly root: string;
