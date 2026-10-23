@@ -1,5 +1,7 @@
 # Quick start / 快速开始
 
+This guide runs the **existing remote-agent/local-tool prototype**. The [new product direction](PRODUCT.md) keeps official Claude Code local and uses ccproxy on the VPS, but that integration has no runnable Tether entrypoint yet. `tether connect` below opens the prototype UI, not the official Claude Code UI.
+
 The supported environment is Linux or WSL2, Node 24.14+ within 24.x, npm, and ripgrep. For Ubuntu/WSL, install ripgrep with `sudo apt-get install ripgrep`. Test contributors also need `openssl`. If you already use nvm, `nvm install && nvm use` reads the checked-in version. See [compatibility](COMPATIBILITY.md) for unverified platforms.
 
 Steps 1–3 use the **fake runtime** and issue no model requests. Step 4 enables the verified official Claude / Pro path and consumes subscription allowance. Keep the official Claude login on the VPS.

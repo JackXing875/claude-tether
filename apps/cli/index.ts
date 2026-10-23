@@ -3,7 +3,9 @@ import { BridgeError, failure } from '../../packages/protocol/index.js';
 import { terminalText } from '../../packages/diagnostics/index.js';
 
 const help: Record<string, string> = {
-  root: `Claude Tether — remote Claude runtime, locally authorized tools
+  root: `Claude Tether — remote-agent prototype for personal VPS access
+
+This build uses the Tether UI. Local official CLI / ccproxy integration is planned.
 
 Usage: tether <command> [options]
 

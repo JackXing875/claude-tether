@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "license": "GPL-3.0-only",
-  "description": "Personal remote Claude Code runtime with locally authorized project tools",
+  "description": "Personal Claude Code access through your VPS; remote-agent prototype",
   "engines": {
     "node": ">=24.14.0 <25"
   },

@@ -10,6 +10,8 @@ Include the affected commit/version, environment, minimal reproduction using dis
 
 ## Boundaries
 
+The following boundaries describe the **implemented remote-agent prototype**. The [planned native-client/ccproxy path](docs/PRODUCT.md) has a different trust boundary: an application-layer proxy can access forwarded request content and authentication headers. Its credential, logging and network behavior has not been validated by the prototype's tests. Neither design promises anonymity or protection from account suspension.
+
 - The relay sees prompts, requested file contents and tool results. State databases and official transcripts may contain source code.
 - Device credentials authenticate to your relay only; official Claude login belongs on the VPS's dedicated account.
 - Local approval is the final authority for writes and commands. Approved commands have the local user's privileges; a cwd is not a sandbox.

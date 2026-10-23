@@ -3,13 +3,20 @@
 [![CI](https://github.com/JackXing875/claude-tether/actions/workflows/ci.yml/badge.svg)](https://github.com/JackXing875/claude-tether/actions/workflows/ci.yml)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
-Run the Claude Code agent on your VPS while keeping project tools and approval on your own computer.
+Personal, self-hosted access for the official Claude Code client through your own VPS.
 
-[中文](README.zh-CN.md) · [Quick start](docs/QUICKSTART.md) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md)
+[中文](README.zh-CN.md) · [Product direction](docs/PRODUCT.md) · [Roadmap](docs/ROADMAP.md) · [Prototype quick start](docs/QUICKSTART.md) · [Contributing](CONTRIBUTING.md)
 
-**Development alpha.** The official Claude Code 2.1.267 / Pro path has passed a live VPS-to-WSL acceptance run: local read/search/edit/test, streamed text, explicit resume after service restart, denial, conflict, cancellation and disconnect recovery. Enable it with `tether server --runtime claude`; `tether connect --ssh YOUR_ALIAS` manages the encrypted connection. See the [live evidence and limits](docs/LIVE-TEST-REPORT.md). This is an independent project, not affiliated with Anthropic.
+**The project is changing direction.** The target is local official Claude Code → SSH tunnel → ccproxy on your VPS → Anthropic. ccproxy handles request forwarding; Tether will manage connection setup, isolated configuration, version pinning, diagnostics and upgrades. The official client will own the agent loop, tools, approval and sessions. Account continuity is the first design priority, followed by native usability; no proxy or request shaping is claimed to prevent account suspension. See the [product scope](docs/PRODUCT.md) and [source-based research](docs/NATIVE-CLAUDE-RESEARCH.md).
 
-## Try it in two minutes
+| Track                               | Status                                                                                            |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Local official CLI with VPS ccproxy | Selected direction; integration, deployment and end-to-end acceptance are pending                 |
+| Remote-agent/local-tool bridge      | Runnable development alpha; controlled official Claude 2.1.267 / Pro VPS-to-WSL acceptance passed |
+
+**The commands below run the existing remote-agent prototype.** `tether connect` does not launch the local official Claude CLI or connect to ccproxy. Its live acceptance covers local read/search/edit/test, streamed text, explicit resume after service restart, denial, conflict, cancellation and disconnect recovery. See the [evidence and limits](docs/LIVE-TEST-REPORT.md). This is an independent project, not affiliated with Anthropic or ccproxy.
+
+## Try the existing prototype
 
 Requirements: Linux or WSL2, Git, Node.js **24.14+ within 24.x**, npm, and `ripgrep` for file search. Use the version in [.nvmrc](.nvmrc) for a reproducible environment. Native Windows and macOS are not supported yet.
 
@@ -29,9 +36,9 @@ node bin/tether.mjs --help
 node bin/tether.mjs doctor
 ```
 
-For separate server/client processes, SSH tunneling, or an installed `tether` command, follow the [quick start](docs/QUICKSTART.md). There is no npm registry release yet; do not assume `npx claude-tether` installs this repository.
+For separate server/client processes, SSH tunneling, or an installed `tether` command, follow the [prototype quick start](docs/QUICKSTART.md). There is no npm registry release yet; do not assume `npx claude-tether` installs this repository.
 
-## How it works
+## How the prototype works
 
 ```mermaid
 flowchart LR
@@ -59,7 +66,7 @@ The project directory remains on the client. Prompts, requested file content and
 - Crash outcomes marked `UNKNOWN` block further mutations until inspected.
 - Typed core modules, source-inclusive tarballs, architecture checks, automated tests and install smoke tests.
 
-Current limits include one active turn per relay, Linux/WSL only, 128 KiB files, 60-second commands, and no background jobs, PTY, automatic reconnect, full TUI, hooks/skills or IDE integration. [Compatibility](docs/COMPATIBILITY.md) records the exact boundary.
+Prototype limits include one active turn per relay, Linux/WSL only, 128 KiB files, 60-second commands, and no background jobs, PTY, automatic reconnect, full TUI, hooks/skills or IDE integration. [Compatibility](docs/COMPATIBILITY.md) records the exact boundary. Recreating the official UI and tool ecosystem is no longer the main roadmap; the new route aims to retain them by running the official client locally.
 
 ## Develop
 

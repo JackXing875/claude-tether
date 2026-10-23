@@ -1,6 +1,8 @@
 # Architecture
 
-Tether separates an agent's location from the location of its tools. A relay owns authentication, session sequencing and event delivery. The local host owns workspace identity, approval and execution. The current runnable agent is `FakeAgent`; the official Claude adapter is isolated behind a compatibility gate.
+Tether's target is local official Claude Code connected through SSH to a ccproxy instance on the user's VPS. Tether will manage connection and deployment lifecycle; the official client will own tools, approval and sessions. This route is not implemented yet. See [product scope](PRODUCT.md), [decisions](DECISIONS.md) and [acceptance gates](ROADMAP.md).
+
+The rest of this page documents the existing remote-agent prototype. It separates an agent's location from the location of its tools: the relay owns authentication, session sequencing and event delivery, while the local host owns workspace identity, approval and execution. Both `FakeAgent` and the explicitly selected official `ClaudeRuntime` are runnable; the latter has passed the controlled [live acceptance](LIVE-TEST-REPORT.md). The bridge protocol is not an Anthropic Messages gateway and cannot be pointed at ccproxy unchanged.
 
 ## Module boundaries
 
@@ -67,9 +69,9 @@ The relay can see transmitted project content, but cannot authorize local operat
 
 One SQLite lease prevents two processes from owning the same state. SIGINT/SIGTERM stop a foreground relay; disconnect cancels local tasks. Client and tool host currently share a process. A daemon, persistent UI attachment, full TUI and Windows Job Objects require separate lifecycle designs.
 
-The official CLI is neither patched nor bundled. Its candidate launch uses a fixed version, explicit bridge tools, strict MCP configuration, explicit session UUIDs and a restricted environment. `--bare` is not used because the planned login is personal Pro/Max. The supervisor-to-MCP bridge now has synthetic subprocess evidence. Real subscription evidence remains a gate in [ROADMAP.md](ROADMAP.md); the public CLI does not enable Claude or silently fall back to fake.
+The official CLI is neither patched nor bundled. The prototype launch uses a fixed version, explicit bridge tools, strict MCP configuration, explicit session UUIDs and a restricted environment. `--bare` is not used because this route uses personal Pro/Max login. The supervisor-to-MCP bridge has both synthetic subprocess tests and controlled real subscription evidence. The public CLI explicitly enables it with `--runtime claude` and never silently falls back to fake. These launch restrictions belong to the remote-agent prototype; they are not the proposed local official CLI configuration.
 
-## Candidate runtime lifecycle
+## Prototype runtime lifecycle
 
 `ClaudeRuntime` is exported from `claude-tether/runtime` for integration work. The public `--runtime claude` entrypoint supplies an absolute installed MCP worker entrypoint, a dedicated infrastructure state directory and the official executable. It verifies the subscription auth method and pinned CLI version, starts each turn in an isolated process group, and connects a real MCP stdio worker to an authenticated numeric-loopback channel. The capability JSON lives in a private per-turn directory and is removed at teardown; it is never placed in argv as a token.
 

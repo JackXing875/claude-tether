@@ -1,6 +1,6 @@
 # Release procedure
 
-Releases remain alpha until the [real-runtime and beta gates](ROADMAP.md) are met. The existing GPL license is retained. npm registry publishing is intentionally disabled by `private: true`; no publishing token is required by CI.
+Releases remain alpha. The remote-agent prototype and the planned native-client/ccproxy route have separate [acceptance gates](ROADMAP.md); identify which one a release actually implements. The existing GPL license is retained. npm registry publishing is intentionally disabled by `private: true`; no publishing token is required by CI.
 
 1. Update package version, lockfile, changelog and versioned quick-start examples together. Record supported Node/Claude versions and storage/protocol compatibility changes.
 2. Run `npm ci`, `npm run verify`, `npm run test:coverage`, `npm run test:package` and the appropriate real-account checks if runtime behavior changed. Verify the proposed GitHub head is green.

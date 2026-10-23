@@ -1,5 +1,7 @@
 # Bridge 1.0：当前实现子集
 
+本文描述现有远端 Agent / 本地工具桥协议，不是 Anthropic Messages 转发协议。新的[本地官方客户端路线](PRODUCT.md)拟由 ccproxy 处理模型请求，不将本协议或旧会话直接接入原生 CLI。
+
 外层为有大小上限的 JSON-RPC 2.0，传输为 WSS；开发/SSH 隧道仅允许显式启用的数字回环 WS。HTTP 升级前验证 Authorization: Bearer 设备ID.secret。请求 URL 不接收 query token，浏览器 Origin 当前被拒绝。
 
 | 方法                  | 当前行为                                                                                 |

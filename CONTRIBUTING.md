@@ -1,6 +1,6 @@
 # Contributing
 
-Tether is a personal remote-agent/local-tool bridge in development alpha. Start with the [architecture](docs/ARCHITECTURE.md), [compatibility boundary](docs/COMPATIBILITY.md) and [roadmap](docs/ROADMAP.md). The fake runtime lets contributors work without a subscription or VPS.
+Tether is becoming a personal, self-hosted access and operations tool for the official local Claude Code client, with ccproxy on the user's VPS. Start with the [product scope](docs/PRODUCT.md), [compatibility boundary](docs/COMPATIBILITY.md) and [roadmap](docs/ROADMAP.md). The current runnable alpha remains a remote-agent/local-tool bridge; its [architecture](docs/ARCHITECTURE.md) and fake runtime let contributors work without a subscription or VPS. Native CLI/ccproxy integration is not implemented yet.
 
 ## Local setup
 
@@ -23,6 +23,7 @@ npm run test:package
 - Synthetic Claude events must be labeled synthetic. Do not check in raw transcripts, credentials, real host identifiers or private project data.
 - No implicit API-key fallback, remote project tools, automatic retry of uncertain effects, disabling TLS validation or broad automatic approval.
 - Update the README/help/quick start when changing an entrypoint, and the compatibility table when adding or removing support.
+- Label native-client/ccproxy work as planned until its acceptance gates pass. The prototype's real model results do not validate a new gateway path. Keep upstream integration versions and license obligations explicit; do not bundle official credentials or binaries.
 
 TypeScript is pinned to 6.0.3 because the current typed ESLint parser supports `<6.1`. Upgrade the compiler and parser together after checking their compatibility. Exact direct dependencies and the lockfile are intentional.
 

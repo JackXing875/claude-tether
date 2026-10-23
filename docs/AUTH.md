@@ -1,6 +1,8 @@
 # 认证
 
-两套身份完全独立。Anthropic 登录只交给 VPS 上的官方 Claude Code 管理；客户端持有的设备凭据只用于自己的 relay，不传给 Anthropic。
+本文的命令适用于已实现的远端 Agent 原型。新的[原生客户端路线](PRODUCT.md)拟由本地官方 CLI 管理用户登录；ccproxy 配置与认证透传仍待验收，不复用本原型的设备 JSON 作为 Anthropic 或 ccproxy 凭据。应用层代理能够接触转发请求中的认证头，应按[调研验收](NATIVE-CLAUDE-RESEARCH.md)检查日志和凭据处理。
+
+在现有原型中，两套身份完全独立。Anthropic 登录只交给 VPS 上的官方 Claude Code 管理；客户端持有的设备凭据只用于自己的 relay，不传给 Anthropic。
 
 ## 本次准备
 

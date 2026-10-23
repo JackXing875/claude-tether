@@ -2,6 +2,7 @@
 
 ## 0.1.0-alpha.1 — Unreleased
 
+- Define the next product direction as personal self-hosted access and operations for local official Claude Code through VPS ccproxy. Add product scope, source-based research and separate acceptance gates; label current commands and live evidence as the existing remote-agent prototype. No ccproxy runtime integration or deployment is included.
 - Introduce the installed `tether` CLI, help/version, explicit runtime selection, device create/revoke, automatic private client state and single-prompt mode.
 - Separate the client, relay, local host and MCP bridge into core modules with typed package exports and enforced dependency boundaries.
 - Encapsulate the event inbox and recover completed turn results from durable local events.

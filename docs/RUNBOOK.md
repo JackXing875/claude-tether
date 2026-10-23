@@ -1,5 +1,7 @@
 # 运行与恢复
 
+本文维护现有远端 Agent / 本地工具桥原型。新的“本地官方 CLI + VPS ccproxy”路线见[项目定位](PRODUCT.md)，尚无部署入口；以下 systemd、设备凭据和恢复命令不适用于 ccproxy。文档调整不会自动迁移或停止已有部署。
+
 ## 安装与运行
 
 先按 [快速开始](QUICKSTART.md) 安装或运行离线演示。开发验证使用 `npm run verify` 和 `npm run test:package`。服务和客户端当前仅支持 Linux/WSL。Node 版本由 .nvmrc 固定，ripgrep 必须存在于本地 PATH。
