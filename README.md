@@ -1,4 +1,4 @@
-# Personal Claude Relay
+# Claude Tether
 
 个人 Claude Code 远端运行时与本地工具桥。目标是：官方 Claude Code 和模型请求运行在自己的 VPS，项目文件、命令与最终权限判断留在客户端。
 
