@@ -6,37 +6,61 @@ import { randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { once } from 'node:events';
 import WebSocket from 'ws';
-import { RelayServer } from '../apps/relay-server/index.js';
-import { BridgeClient } from '../apps/bridge-cli/client.js';
+import { RelayServer } from '../packages/relay/index.js';
+import { BridgeClient } from '../packages/client/index.js';
 import type { AgentRuntime } from '../packages/runtime-adapter/types.js';
 import { fixture } from './helpers.js';
 import type { TestContext } from 'node:test';
 import type { RelayEvent } from '../packages/protocol/index.js';
 
-async function network(t: TestContext, runtime?: AgentRuntime, tls?: { cert: Buffer; key: Buffer }) {
+async function network(
+  t: TestContext,
+  runtime?: AgentRuntime,
+  tls?: { cert: Buffer; key: Buffer },
+) {
   const f = await fixture(t);
-  const server = new RelayServer({ statePath: join(f.base, 'remote-state', 'relay.sqlite'), runtime, tls });
+  const server = new RelayServer({
+    statePath: join(f.base, 'remote-state', 'relay.sqlite'),
+    runtime,
+    tls,
+  });
   const device = server.store.provision(f.binding.device_id);
   const url = await server.listen();
   const { session_id: _s, worker_epoch: _e, ...workspace } = f.binding;
   const clients: BridgeClient[] = [];
-  t.after(async () => { for (const c of clients) c.close(); await server.close(); });
+  t.after(async () => {
+    for (const c of clients) c.close();
+    await server.close();
+  });
   const connect = async (extra: Partial<Parameters<typeof BridgeClient.connect>[0]> = {}) => {
-    const client = await BridgeClient.connect({ url, token: device.token, host: f.host, workspace, allowInsecureLoopback: true, ...extra });
-    clients.push(client); return client;
+    const client = await BridgeClient.connect({
+      url,
+      token: device.token,
+      host: f.host,
+      workspace,
+      allowInsecureLoopback: true,
+      ...extra,
+    });
+    clients.push(client);
+    return client;
   };
   return { ...f, server, device, url, workspace, connect };
 }
 
-test('fake agent reads, edits and tests exclusively in the client workspace over real WebSocket', async (t) => {
+void test('fake agent reads, edits and tests exclusively in the client workspace over real WebSocket', async (t) => {
   const f = await network(t);
   await writeFile(join(f.root, 'calc.mjs'), 'export function add(a,b) { return a - b; }\n');
-  await writeFile(join(f.root, 'calc.test.mjs'), "import {add} from './calc.mjs'; if(add(2,3)!==5) process.exit(1);\n");
+  await writeFile(
+    join(f.root, 'calc.test.mjs'),
+    "import {add} from './calc.mjs'; if(add(2,3)!==5) process.exit(1);\n",
+  );
   const events: RelayEvent[] = [];
-  const client = await f.connect({ onEvent: (e) => {
-    assert.ok(f.host.journal.storage.db.prepare('SELECT payload FROM inbox_events WHERE session_id=? AND cursor=?').get(e.session_id, e.cursor));
-    events.push(e);
-  } });
+  const client = await f.connect({
+    onEvent: (e) => {
+      assert.ok(f.host.journal.events(e.session_id).some((saved) => saved.cursor === e.cursor));
+      events.push(e);
+    },
+  });
   const receipt = await client.submit('demo', 'stable-message');
   assert.equal((await client.waitTurn(receipt.turn_id)).type, 'completed');
   assert.ok((await readFile(join(f.root, 'calc.mjs'), 'utf8')).includes('return a + b;'));
@@ -44,48 +68,85 @@ test('fake agent reads, edits and tests exclusively in the client workspace over
   const duplicate = await client.submit('demo', 'stable-message');
   assert.equal(duplicate.created, false);
   assert.equal(duplicate.turn_id, receipt.turn_id);
-  await assert.rejects(client.submit('different prompt', 'stable-message'), { code: 'MESSAGE_CONFLICT' });
+  await assert.rejects(client.submit('different prompt', 'stable-message'), {
+    code: 'MESSAGE_CONFLICT',
+  });
   await assert.rejects(readFile(join(f.base, 'remote-state', 'calc.mjs')), { code: 'ENOENT' });
 });
 
-test('authentication, hello device binding, and protocol version reject forged clients', async (t) => {
+void test('authentication, hello device binding, and protocol version reject forged clients', async (t) => {
   const f = await network(t);
   await assert.rejects(f.connect({ token: 'invalid' }));
-  await assert.rejects(f.connect({ workspace: { ...f.workspace, device_id: randomUUID() } }), { code: 'DEVICE_MISMATCH' });
+  await assert.rejects(f.connect({ workspace: { ...f.workspace, device_id: randomUUID() } }), {
+    code: 'DEVICE_MISMATCH',
+  });
   const socket = new WebSocket(f.url, { headers: { Authorization: 'Bearer ' + f.device.token } });
   await once(socket, 'open');
   const { RpcPeer } = await import('../packages/transport/index.js');
   const peer = new RpcPeer(socket);
   try {
-    await assert.rejects(peer.request('session.create', f.workspace), { code: 'PROTOCOL_MISMATCH' });
-    await assert.rejects(peer.request('connection.hello', { protocol_version: '99', device_id: f.device.device_id }), { code: 'PROTOCOL_MISMATCH' });
-  } finally { peer.close(); socket.terminate(); }
+    await assert.rejects(peer.request('session.create', f.workspace), {
+      code: 'PROTOCOL_MISMATCH',
+    });
+    await assert.rejects(
+      peer.request('connection.hello', { protocol_version: '99', device_id: f.device.device_id }),
+      { code: 'PROTOCOL_MISMATCH' },
+    );
+  } finally {
+    peer.close();
+    socket.terminate();
+  }
 });
 
-test('explicit resume preserves project binding, bumps epoch and does not replay displayed events', async (t) => {
+void test('explicit resume preserves project binding, bumps epoch and does not replay displayed events', async (t) => {
   const f = await network(t);
   await writeFile(join(f.root, 'local.txt'), 'local result');
   let displayed = 0;
-  const client = await f.connect({ onEvent: () => { displayed++; } });
+  const client = await f.connect({
+    onEvent: () => {
+      displayed++;
+    },
+  });
   const receipt = await client.submit('read local.txt');
   await client.waitTurn(receipt.turn_id);
-  const count = displayed, binding = client.binding!;
-  const closed = once(client.peer.socket, 'close'); client.close(); await closed;
+  const count = displayed,
+    binding = client.binding!;
+  const closed = once(client.peer.socket, 'close');
+  client.close();
+  await closed;
   await new Promise((resolve) => setTimeout(resolve, 20));
-  await assert.rejects(f.connect({ resumeSession: binding.session_id, workspace: { ...f.workspace, workspace_id: randomUUID() } }), { code: 'WORKSPACE_MISMATCH' });
-  const restored = await f.connect({ resumeSession: binding.session_id, onEvent: () => { displayed++; } });
+  await assert.rejects(
+    f.connect({
+      resumeSession: binding.session_id,
+      workspace: { ...f.workspace, workspace_id: randomUUID() },
+    }),
+    { code: 'WORKSPACE_MISMATCH' },
+  );
+  const restored = await f.connect({
+    resumeSession: binding.session_id,
+    onEvent: () => {
+      displayed++;
+    },
+  });
   assert.equal(restored.binding!.worker_epoch, binding.worker_epoch + 1);
   assert.equal(displayed, count);
-  const replay = await restored.peer.request('events.resume', { session_id: binding.session_id, cursor: 0 }) as RelayEvent[];
+  assert.equal((await restored.waitTurn(receipt.turn_id, 100)).type, 'completed');
+  const replay = (await restored.peer.request('events.resume', {
+    session_id: binding.session_id,
+    cursor: 0,
+  })) as RelayEvent[];
   assert.ok(replay.some((e) => e.type === 'completed'));
   assert.ok(replay.every((e, i) => i === 0 || e.cursor > replay[i - 1]!.cursor));
 });
 
-test('lost tool response is reconciled from the local journal without repeating an effect', async (t) => {
+void test('lost tool response is reconciled from the local journal without repeating an effect', async (t) => {
   const runtime: AgentRuntime = {
     kind: 'fake',
     async run(turn) {
-      await turn.execute('run_command', { program: 'node', args: ['-e', "require('fs').appendFileSync('count','x')"] });
+      await turn.execute('run_command', {
+        program: 'node',
+        args: ['-e', "require('fs').appendFileSync('count','x')"],
+      });
     },
   };
   const f = await network(t, runtime);
@@ -108,7 +169,7 @@ test('lost tool response is reconciled from the local journal without repeating 
   assert.equal(await readFile(join(f.root, 'count'), 'utf8'), 'x');
 });
 
-test('device revocation disconnects an existing socket and prevents reconnect', async (t) => {
+void test('device revocation disconnects an existing socket and prevents reconnect', async (t) => {
   const f = await network(t);
   const client = await f.connect();
   const closed = once(client.peer.socket, 'close');
@@ -117,34 +178,72 @@ test('device revocation disconnects an existing socket and prevents reconnect', 
   await assert.rejects(f.connect());
 });
 
-test('the same session cannot be taken over by another live connection', async (t) => {
+void test('the same session cannot be taken over by another live connection', async (t) => {
   const f = await network(t);
   const client = await f.connect();
-  await assert.rejects(f.connect({ resumeSession: client.binding!.session_id }), { code: 'SESSION_BUSY' });
+  await assert.rejects(f.connect({ resumeSession: client.binding!.session_id }), {
+    code: 'SESSION_BUSY',
+  });
 });
 
-test('TLS certificate validation is required, and WSS works with an explicitly trusted test CA', async (t) => {
+void test('TLS certificate validation is required, and WSS works with an explicitly trusted test CA', async (t) => {
   const f = await fixture(t);
-  const certPath = join(f.base, 'tls.crt'), keyPath = join(f.base, 'tls.key');
-  execFileSync('openssl', [
-    'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', keyPath, '-out', certPath,
-    '-days', '1', '-subj', '/CN=localhost', '-addext', 'subjectAltName=IP:127.0.0.1',
-  ], { stdio: 'ignore' });
-  const cert = await readFile(certPath), key = await readFile(keyPath);
-  const server = new RelayServer({ statePath: join(f.base, 'remote', 'relay.sqlite'), tls: { cert, key } });
+  const certPath = join(f.base, 'tls.crt'),
+    keyPath = join(f.base, 'tls.key');
+  execFileSync(
+    'openssl',
+    [
+      'req',
+      '-x509',
+      '-newkey',
+      'rsa:2048',
+      '-nodes',
+      '-keyout',
+      keyPath,
+      '-out',
+      certPath,
+      '-days',
+      '1',
+      '-subj',
+      '/CN=localhost',
+      '-addext',
+      'subjectAltName=IP:127.0.0.1',
+    ],
+    { stdio: 'ignore' },
+  );
+  const cert = await readFile(certPath),
+    key = await readFile(keyPath);
+  const server = new RelayServer({
+    statePath: join(f.base, 'remote', 'relay.sqlite'),
+    tls: { cert, key },
+  });
   const device = server.store.provision(f.binding.device_id);
   const url = await server.listen();
   const { session_id: _s, worker_epoch: _e, ...workspace } = f.binding;
   let client: BridgeClient | undefined;
   try {
-    await assert.rejects(BridgeClient.connect({ url, token: device.token, host: f.host, workspace }));
-    client = await BridgeClient.connect({ url, token: device.token, host: f.host, workspace, ca: cert });
+    await assert.rejects(
+      BridgeClient.connect({ url, token: device.token, host: f.host, workspace }),
+    );
+    client = await BridgeClient.connect({
+      url,
+      token: device.token,
+      host: f.host,
+      workspace,
+      ca: cert,
+    });
     const turn = await client.submit('hello');
     assert.equal((await client.waitTurn(turn.turn_id)).type, 'completed');
-  } finally { client?.close(); await server.close(); }
+  } finally {
+    client?.close();
+    await server.close();
+  }
 });
 
-test('non-loopback plaintext transport is rejected before networking', async (t) => {
+void test('non-loopback plaintext transport is rejected before networking', async (t) => {
   const f = await network(t);
-  await assert.rejects(f.connect({ url: 'ws://example.com/v1/bridge', allowInsecureLoopback: true }), { code: 'TLS_REQUIRED' });
+  await assert.rejects(
+    f.connect({ url: 'ws://example.com/v1/bridge', allowInsecureLoopback: true }),
+    { code: 'TLS_REQUIRED' },
+  );
 });

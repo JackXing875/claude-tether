@@ -1,0 +1,40 @@
+name: Release candidate
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+  bundle:
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Check tag and manifest agree
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: node -e 'if (process.env.REF_TYPE === "tag" && process.env.REF_NAME !== "v" + require("./package.json").version) process.exit(1)'
+      - run: npm ci
+      - run: npm run test:package
+      - name: Include corresponding source and checksums
+        run: |
+          git archive --format=tar.gz --prefix=claude-tether-source/ --output=artifacts/claude-tether-source.tar.gz HEAD
+          cd artifacts
+          sha256sum claude-tether-source.tar.gz >> SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-candidate-${{ github.sha }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 30

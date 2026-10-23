@@ -11,7 +11,9 @@
     "rootDir": ".",
     "outDir": "dist",
     "sourceMap": true,
-    "types": ["node"]
+    "types": ["node"],
+    "declaration": true,
+    "declarationMap": true
   },
   "include": ["apps/**/*.ts", "packages/**/*.ts", "tests/**/*.ts"]
 }

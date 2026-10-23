@@ -1,19 +1,90 @@
-name: Test prototype
+name: CI
 on:
   push:
+    branches: [main, 'codex/**']
   pull_request:
+  workflow_dispatch:
+  workflow_call:
 permissions:
   contents: read
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+defaults:
+  run:
+    shell: bash
 jobs:
-  test:
+  quality:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
           cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run check:architecture
+      - run: npm run check:docs
+      - run: npm audit --omit=dev --audit-level=high
+  test:
+    name: test (Node ${{ matrix.node }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['24.14.0', '24']
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
       - run: sudo apt-get update && sudo apt-get install -y ripgrep openssl
       - run: npm ci
-      - run: npm test
-      - run: npm audit --omit=dev
+      - run: npm run test:coverage
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: coverage-node-${{ matrix.node }}
+          path: coverage/lcov.info
+          if-no-files-found: warn
+          retention-days: 14
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: sudo apt-get update && sudo apt-get install -y ripgrep
+      - run: npm ci
+      - run: npm run test:package
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: package-${{ github.sha }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 14
+  required:
+    if: always()
+    needs: [quality, test, package]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Require every check to succeed
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: node -e 'if (Object.values(JSON.parse(process.env.RESULTS)).some(job => job.result !== "success")) process.exit(1)'

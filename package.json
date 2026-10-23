@@ -1,22 +1,32 @@
 {
   "name": "claude-tether",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.1",
   "private": true,
   "type": "module",
-  "license": "UNLICENSED",
+  "license": "GPL-3.0-only",
   "description": "Personal remote Claude Code runtime with locally authorized project tools",
   "engines": {
     "node": ">=24.14.0 <25"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node scripts/build.mjs",
+    "build:test": "node scripts/build.mjs --tests",
     "check": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node --test dist/tests/*.test.js",
-    "demo": "npm run build && node dist/apps/bridge-cli/demo.js",
-    "doctor": "npm run build && node dist/apps/bridge-cli/doctor.js",
-    "probe": "node dist/apps/bridge-cli/probe.js",
-    "server": "node dist/apps/relay-server/main.js",
-    "bridge": "node dist/apps/bridge-cli/main.js"
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check:architecture": "node scripts/check-architecture.mjs",
+    "check:docs": "node scripts/check-docs.mjs",
+    "test": "npm run build:test && node --test dist/tests/*.test.js",
+    "test:coverage": "npm run build:test && node scripts/coverage.mjs",
+    "test:package": "node scripts/package-smoke.mjs",
+    "verify": "npm run check && npm run lint && npm run format:check && npm run check:architecture && npm run check:docs && npm test",
+    "prepack": "npm run build",
+    "demo": "npm run build && node bin/tether.mjs demo",
+    "doctor": "npm run build && node bin/tether.mjs doctor",
+    "probe": "node bin/tether.mjs probe",
+    "server": "node bin/tether.mjs server",
+    "bridge": "node bin/tether.mjs connect"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
@@ -25,8 +35,75 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
     "@types/node": "24.19.2",
     "@types/ws": "8.18.2",
-    "typescript": "7.0.2"
+    "eslint": "10.13.0",
+    "globals": "17.13.0",
+    "prettier": "3.9.10",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.0"
+  },
+  "bin": {
+    "tether": "bin/tether.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JackXing875/claude-tether.git"
+  },
+  "homepage": "https://github.com/JackXing875/claude-tether#readme",
+  "bugs": {
+    "url": "https://github.com/JackXing875/claude-tether/issues"
+  },
+  "keywords": [
+    "claude",
+    "remote-development",
+    "mcp",
+    "local-tools"
+  ],
+  "files": [
+    "bin/",
+    "dist/apps/",
+    "dist/packages/",
+    "apps/",
+    "packages/",
+    "scripts/build.mjs",
+    "tsconfig.json",
+    "tsconfig.build.json",
+    "README.zh-CN.md",
+    "docs/",
+    "examples/",
+    "LICENSE",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "START.md",
+    ".nvmrc"
+  ],
+  "exports": {
+    "./client": {
+      "types": "./dist/packages/client/index.d.ts",
+      "import": "./dist/packages/client/index.js"
+    },
+    "./relay": {
+      "types": "./dist/packages/relay/index.d.ts",
+      "import": "./dist/packages/relay/index.js"
+    },
+    "./local-host": {
+      "types": "./dist/packages/local-host/index.d.ts",
+      "import": "./dist/packages/local-host/index.js"
+    },
+    "./protocol": {
+      "types": "./dist/packages/protocol/index.d.ts",
+      "import": "./dist/packages/protocol/index.js"
+    },
+    "./mcp-bridge": {
+      "types": "./dist/packages/mcp-bridge/index.d.ts",
+      "import": "./dist/packages/mcp-bridge/index.js"
+    },
+    "./runtime": {
+      "types": "./dist/packages/runtime-adapter/types.d.ts",
+      "import": "./dist/packages/runtime-adapter/types.js"
+    }
   }
 }

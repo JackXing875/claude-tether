@@ -1,10 +1,10 @@
-# 原型运行与恢复
+# 运行与恢复
 
 ## 安装与运行
 
-先按 README 执行 npm ci、npm test、npm run demo。服务和客户端当前仅支持 Linux/WSL。Node 版本由 .nvmrc 固定，ripgrep 必须存在于本地 PATH。
+先按 [快速开始](QUICKSTART.md) 安装或运行离线演示。开发验证使用 `npm run verify` 和 `npm run test:package`。服务和客户端当前仅支持 Linux/WSL。Node 版本由 .nvmrc 固定，ripgrep 必须存在于本地 PATH。
 
-服务端设备注册会将 secret 写入指定的 0600 文件；不要将该文件放入项目或命令参数。启动 CLI 需要服务 URL、设备文件、工作区和专属私有状态目录。工作区或策略发生变化时，使用新的绑定；不要复用另一个设备的状态目录。
+服务端设备注册会将 secret 写入指定的 0600 文件；不要将该文件放入项目或命令参数。`tether connect` 需要服务 URL 和设备文件；工作区默认当前目录，私有状态默认根据 URL/设备/项目/策略自动选择。工作区或策略发生变化时，使用新的绑定；不要复用另一个设备的状态目录。
 
 P1 网络配置：
 
@@ -26,12 +26,12 @@ STATE_IN_USE 表示同一状态库已有活进程持有 SQLite lease。正常退
 
 deploy/bootstrap-vps.sh 仅准备 P0 依赖：独立 claude-relay 账号、/var/lib/claude-relay、官方 Claude Code 2.1.267，以及 /opt/personal-relay/runtime 下固定版本 Node。Node 归档校验 SHA-256，Claude 走官方安装器。脚本不配置防火墙、不注册 systemd、不开放公网端口。
 
-原型程序副本位于 /opt/personal-relay/prototype，包含编译产物和生产依赖；源代码与构建保留在本地。VPS 直接使用 node 运行 dist 入口；需要更新时先在本地构建、验证，再复制产物。真实订阅稍后按 AUTH.md 登录。日常服务部署、TLS 域名、systemd 启动及资源测量仍待 P0 之后开展。
+原型程序副本位于 /opt/personal-relay/prototype，包含编译产物和生产依赖；源代码与构建保留在本地。该副本属于首轮原型，不会自动跟随 GitHub 更新。新版应按快速开始安装经过验收的 tarball，使用 `tether` 或 `node bin/tether.mjs`；升级前停止旧进程并备份状态。真实订阅稍后按 AUTH.md 登录。日常服务部署、TLS 域名、systemd 启动及资源测量仍待 P0 之后开展。
 
 维护时保留 DISABLE_AUTOUPDATER=1；新版本先通过契约测试与真实 P0，再更新固定版本。当前网页文档可能描述比 2.1.267 更新的功能，本项目以实际安装版本帮助信息和测试为准。
 
 ## 诊断
 
-npm run doctor 输出脱敏的本地版本/认证方式，不发起模型请求。设备、操作和事件状态是私有数据；即使普通日志不存正文，SQLite 的结果和事件、官方 transcript 仍可能包含代码。
+`tether doctor --json` 输出脱敏的本地版本/认证方式，不发起模型请求。设备、操作和事件状态是私有数据；即使普通日志不存正文，SQLite 的结果和事件、官方 transcript 仍可能包含代码。
 
 测试用的临时账号凭据和进程需要在联调后清理。保留安装好的专用运行环境，便于后续官方登录。不要停止 VPS 上不属于本项目的其他服务。

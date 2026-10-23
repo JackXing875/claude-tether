@@ -1,0 +1,33 @@
+name: Bug report
+description: Report a reproducible problem using disposable data.
+body:
+  - type: markdown
+    attributes:
+      value: 'For vulnerabilities, follow SECURITY.md. Do not include credentials, raw state databases, transcripts or private project content.'
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Include tether --version and the commit if using a checkout.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, WSL if applicable, Node version and fake/probe runtime.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction and expected behavior
+      description: Minimal steps using a temporary project; include only sanitized errors.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true

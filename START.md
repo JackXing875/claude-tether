@@ -1,9 +1,9 @@
 # 个人 Claude 中转站：远端 Agent 与本地工具桥接设计及交接文档
 
-版本：1.1（新增 2026-10-23 实施记录；原始设计保留）  
+版本：1.2（开源工程化；原始设计与首轮证据保留）
 编写日期：2026-10-22（Asia/Shanghai）  
 用途：在一个全新的开发 session 中，仅依靠本文恢复需求、理解架构并开始实现。  
-状态：已实现 P0/P1 原型、自动化测试和 VPS 运行时准备；真实订阅登录及模型联调按用户要求留待后续。最新证据与未完成项见第 30 节。
+状态：已实现 P0/P1 原型、自动化测试和 VPS 运行时准备；真实订阅登录及模型联调按用户要求留待后续。当前开源入口见第 31 节；首轮证据保留在第 30 节。
 
 > 给接手的开发 Agent：先阅读第 0、3、5、9、23、26 节。本文已记录用户最终选择，不要重新把项目默认改为 API Key 网关、本地 Claude Code 加代理，或 VPS 远程开发环境。实施中可以提出改进，但改变这些选择需要用户明确同意。
 
@@ -2001,3 +2001,15 @@ VPS 约 1 GB RAM，低于官方列出的 4 GB 系统要求。当前只证明安�
 
 
 
+
+## 31. Claude Tether 开源工程化（2026-10-23）
+
+主仓库为 [JackXing875/claude-tether](https://github.com/JackXing875/claude-tether)，以 GitHub main 内容为起点。用户已加入 GPL-3.0 LICENSE；第 30 节的“无远程仓库 / UNLICENSED”为历史状态，不再适用。
+
+本轮将原型拆为可独立导入的核心模块，并提供统一 `tether` CLI、私有状态默认值、设备管理、类型声明和可安装 tarball。SQLite 内部表由所属模块管理，依赖方向由架构检查约束。TypeScript 固定为与当前 ESLint 类型分析兼容的 6.0.3。
+
+当前用法以 [README](README.md)、[快速开始](docs/QUICKSTART.md)和 CLI `--help` 为准；旧 `dist/apps/*/main.js` 直接启动方式已被统一入口替代。持续测试覆盖源码检查、Linux/Node 24、权限/恢复、独立 CLI 进程，以及仓库外仅生产依赖安装。GitHub CI 是否通过必须核对具体提交，不能仅依据本地结果。
+
+[架构](docs/ARCHITECTURE.md)、[贡献指南](CONTRIBUTING.md)、[测试说明](docs/TESTING.md)、[发布流程](docs/RELEASING.md)与[路线图](docs/ROADMAP.md)承接后续维护。`private: true` 只防止误发布 npm，并不改变 GPL 开源许可。
+
+H1—H5 不变，真实官方订阅链路仍是独立退出条件。工程化和离线 CI 不证明真实 Claude 可用；当前明确要求 `--runtime fake`，不会自动回退或冒充已完成模型联调。官方登录仍由用户本人完成，凭据不进入仓库和 CI。
