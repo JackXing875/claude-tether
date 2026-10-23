@@ -23,7 +23,7 @@ workerEnvironment 在启动模型进程前拒绝已知 API Key、网关/第三�
 
 候选参数使用 --tools 空值和 --strict-mcp-config，明确列出允许的桥接工具。禁止 --bare，因为它不读取订阅登录。[官方说明](https://code.claude.com/docs/en/headless#start-faster-with-bare-mode)
 
-完成登录后，可在 VPS 上用原型的 probe 命令验证只读 MCP、流式输出和明确会话恢复：
+完成登录后，可在 VPS 上用 probe 命令检查只读 MCP、结构化输出与明确会话恢复：
 
 ```bash
 PATH=/opt/personal-relay/runtime/node-v24.14.0-linux-x64/bin:$PATH \
@@ -34,6 +34,10 @@ node /opt/personal-relay/prototype/bin/tether.mjs probe \
 ```
 
 上例要求先把当前包安装/更新到该位置；早期 VPS 副本不会自动更新。使用已安装 CLI 时也可直接运行 `tether probe --cwd 私有目录 --claude 官方可执行文件`。该探针最多发出两轮真实请求，可能占用订阅额度；要求官方状态为 claude.ai，拒绝其他认证路径。它不是完整中转站验收，也未覆盖持续 stdin、多轮中断和完整配置隔离。
+
+第一轮必须实际调用唯一的 `workspace_info` MCP 工具并返回本次随机生成的标记。第二轮必须沿用指定 UUID，在不调用工具的情况下回忆第一轮标记；新提示不会携带答案，工具中的标记也已更换。只返回成功状态、换成另一会话、重新调用工具或忘记标记都会失败，不能据此宣称恢复成功。标记可以跨多条文本事件到达；探针不把这一检查当作完整的流式延迟验收。
+
+`--cwd` 是专用基础设施父目录，要求私有权限 0700；已存在的公开目录会被拒绝，不会被静默 chmod。每次运行在新建的临时子目录中保存挑战和 MCP 配置，成功、失败或 Ctrl-C/SIGTERM 后清理该子目录，并终止 CLI/MCP 进程组；父目录中的其他文件保留。官方 CLI 在 HOME 中管理的 transcript 不属于此临时目录清理范围。输出只包含布尔验收结果和脱敏错误，不输出随机标记或原始模型文本。
 
 ## 设备凭据
 

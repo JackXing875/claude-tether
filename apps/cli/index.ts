@@ -51,6 +51,8 @@ The database defaults to the same private state path as tether server.`,
   probe: `Usage: tether probe --cwd <private-infrastructure-directory> [--claude <executable>]
 Runs two real Claude turns and consumes your subscription allowance.
 Run on the VPS as its dedicated non-root user, after official claude auth login.
+Checks a fresh MCP marker and its recall in the same explicit session without a second tool call.
+Ctrl-C cancels the probe and removes its temporary files; use a private parent directory (700).
 This checks compatibility; it does not expose the workspace or start a relay.`,
 };
 

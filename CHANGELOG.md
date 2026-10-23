@@ -11,6 +11,7 @@
 - Add a candidate official CLI supervisor with per-turn MCP capabilities, persistent explicit runtime session IDs, process-group teardown and synthetic subprocess integration tests. The public CLI remains fake-only pending official P0 verification.
 - Fix concurrent `BridgeClient.waitTurn` observers losing completion/disconnection results. Each observer now has an independent deadline; closing the client rejects all pending observers immediately. Validate deadlines and cap outstanding observers at 64 per client.
 - Add `tether sessions` and `BridgeClient.listSessions` for authenticated discovery scoped to the exact saved workspace. Queries return status metadata without creating sessions, running tools, advancing epochs or modifying the local journal. Share private workspace identity validation with `connect`.
+- Strengthen the two-turn P0 probe with a fresh MCP challenge, exact session/tool checks and recall without a second tool call. Handle fragmented marker output, cancel CLI/MCP children on signals, clean private per-run files and reject public probe directories without changing their permissions.
 
 ### Compatibility
 

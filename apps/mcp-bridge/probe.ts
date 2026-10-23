@@ -1,6 +1,16 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { readFileSync } from 'node:fs';
+import { parseArgs } from 'node:util';
+import { z } from 'zod';
+
+const { values } = parseArgs({ options: { challenge: { type: 'string' } } });
+if (!values.challenge) throw new Error('A private probe challenge file is required.');
+const challenge = z
+  .object({ marker: z.string().regex(/^p0-[a-f0-9]{32}$/) })
+  .strict()
+  .parse(JSON.parse(readFileSync(values.challenge, 'utf8')));
 
 // P0 only: deliberately no remote file or command tools. stdout is MCP-only.
 const server = new Server(
@@ -23,7 +33,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => ({
       type: 'text',
       text:
         request.params.name === 'workspace_info'
-          ? '{"probe":"personal-relay-p0","project_access":false}'
+          ? JSON.stringify({ probe: challenge.marker, project_access: false })
           : '{"error":"unsupported tool"}',
     },
   ],
