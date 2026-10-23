@@ -25,20 +25,18 @@ export interface ClientOptions {
   onEvent?: (event: RelayEvent) => void;
 }
 const receiptSchema = z.object({ turn_id: id, state: z.string(), created: z.boolean() }).strict();
+interface TurnWaiter {
+  resolve: (event: RelayEvent) => void;
+  reject: (error: unknown) => void;
+  timer: NodeJS.Timeout;
+}
 
 export class BridgeClient {
   readonly peer: RpcPeer;
   binding?: Binding;
   runtime?: 'fake' | 'claude';
   private events = new Map<string, RelayEvent>();
-  private waiters = new Map<
-    string,
-    {
-      resolve: (event: RelayEvent) => void;
-      reject: (error: unknown) => void;
-      timer: NodeJS.Timeout;
-    }
-  >();
+  private waiters = new Map<string, Set<TurnWaiter>>();
   private connected = true;
   private constructor(
     private readonly options: ClientOptions,
@@ -68,10 +66,15 @@ export class BridgeClient {
       return { cancel_requested: true };
     });
     this.peer.handle('event.emit', (raw) => this.receive(eventSchema.parse(raw)));
-    socket.on('close', () => {
-      this.connected = false;
-      options.host.cancelAll();
-      for (const waiter of this.waiters.values()) {
+    socket.on('close', () => this.disconnect());
+    socket.on('error', () => this.disconnect());
+  }
+  private disconnect(): void {
+    if (!this.connected) return;
+    this.connected = false;
+    this.options.host.cancelAll();
+    for (const waiters of this.waiters.values()) {
+      for (const waiter of waiters) {
         clearTimeout(waiter.timer);
         waiter.reject(
           new BridgeError(
@@ -80,8 +83,8 @@ export class BridgeClient {
           ),
         );
       }
-      this.waiters.clear();
-    });
+    }
+    this.waiters.clear();
   }
   static async connect(options: ClientOptions): Promise<BridgeClient> {
     const url = new URL(options.url);
@@ -167,11 +170,13 @@ export class BridgeClient {
     if (['completed', 'failed', 'cancelled'].includes(event.type)) {
       this.events.set(event.turn_id, event);
       if (this.events.size > 256) this.events.delete(this.events.keys().next().value!);
-      const waiter = this.waiters.get(event.turn_id);
-      if (waiter) {
-        clearTimeout(waiter.timer);
-        waiter.resolve(event);
+      const waiters = this.waiters.get(event.turn_id);
+      if (waiters) {
         this.waiters.delete(event.turn_id);
+        for (const waiter of waiters) {
+          clearTimeout(waiter.timer);
+          waiter.resolve(event);
+        }
       }
     }
     this.options.onEvent?.(event);
@@ -204,6 +209,13 @@ export class BridgeClient {
     );
   }
   waitTurn(turnId: string, timeoutMs = 120_000): Promise<RelayEvent> {
+    if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 2_147_483_647)
+      return Promise.reject(
+        new BridgeError(
+          'INVALID_ARGUMENT',
+          'Turn wait timeout must be an integer from 1 to 2147483647 milliseconds.',
+        ),
+      );
     const event =
       this.events.get(turnId) ??
       (this.binding &&
@@ -216,9 +228,14 @@ export class BridgeClient {
     if (event) return Promise.resolve(event);
     if (!this.connected)
       return Promise.reject(new BridgeError('WORKSPACE_OFFLINE', 'Connection is closed.'));
+    if ([...this.waiters.values()].reduce((count, waiters) => count + waiters.size, 0) >= 64)
+      return Promise.reject(new BridgeError('RESOURCE_LIMIT', 'Too many outstanding turn waits.'));
+    const waiters = this.waiters.get(turnId) ?? new Set<TurnWaiter>();
+    this.waiters.set(turnId, waiters);
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
-        this.waiters.delete(turnId);
+        waiters.delete(waiter);
+        if (!waiters.size) this.waiters.delete(turnId);
         reject(
           new BridgeError(
             'TURN_TIMEOUT',
@@ -226,7 +243,8 @@ export class BridgeClient {
           ),
         );
       }, timeoutMs);
-      this.waiters.set(turnId, { resolve, reject, timer });
+      const waiter = { resolve, reject, timer };
+      waiters.add(waiter);
     });
   }
   async cancel(turnId: string): Promise<void> {
@@ -237,7 +255,7 @@ export class BridgeClient {
     });
   }
   close(): void {
-    this.options.host.cancelAll();
+    this.disconnect();
     this.peer.close();
     this.socket.terminate();
   }

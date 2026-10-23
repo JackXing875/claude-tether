@@ -8,8 +8,8 @@
 - Add CLI process integration tests, configuration tests, coverage reports and a clean production-install smoke test.
 - Add supported-Node CI, quality checks, dependency updates, source-inclusive release artifacts and contributor/security documentation.
 - Align package metadata with the repository's existing GPL-3.0 license. Pin TypeScript 6.0.3 to match the supported typed ESLint parser.
-
 - Add a candidate official CLI supervisor with per-turn MCP capabilities, persistent explicit runtime session IDs, process-group teardown and synthetic subprocess integration tests. The public CLI remains fake-only pending official P0 verification.
+- Fix concurrent `BridgeClient.waitTurn` observers losing completion/disconnection results. Each observer now has an independent deadline; closing the client rejects all pending observers immediately. Validate deadlines and cap outstanding observers at 64 per client.
 
 ### Compatibility
 

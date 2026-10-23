@@ -45,6 +45,8 @@ flowchart TD
 
 Compatibility re-exports under the original `apps` locations preserve checkout imports during the refactor. New code uses `packages`; applications own startup and have no public library entrypoint. Importing public modules opens no socket or state database.
 
+`BridgeClient.waitTurn(turnId, timeoutMs)` observes a terminal event; it does not submit or cancel a turn. Multiple callers can observe the same turn with independent deadlines. Timeout reports `TURN_TIMEOUT` without establishing the remote outcome; callers can wait again or explicitly resume after disconnect. Deadlines must be integer milliseconds in the range 1–2147483647 (default 120000); up to 64 pending observers are allowed per client. `close()` immediately rejects all pending observers with `WORKSPACE_OFFLINE` and is safe to repeat. The application still owns and must close its `LocalHost`. Already retained terminal events remain readable after closing the connection.
+
 ## A tool call
 
 1. The relay binds a turn to device, workspace generation, execution target, policy revision and worker epoch.

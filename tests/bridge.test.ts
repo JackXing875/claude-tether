@@ -247,3 +247,73 @@ void test('non-loopback plaintext transport is rejected before networking', asyn
     { code: 'TLS_REQUIRED' },
   );
 });
+
+void test('all callers waiting for the same turn receive its durable terminal event', async (t) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  t.after(() => release());
+  const f = await network(t, { kind: 'fake', run: () => gate });
+  const client = await f.connect();
+  const receipt = await client.submit('one turn, two observers');
+  const completed = Promise.all([
+    client.waitTurn(receipt.turn_id, 1000),
+    client.waitTurn(receipt.turn_id, 1000),
+  ]);
+  release();
+  const events = await completed;
+  assert.equal(events[0]!.type, 'completed');
+  assert.deepEqual(events[0], events[1]);
+  assert.ok(
+    f.host.journal.events(client.binding!.session_id).some((e) => e.cursor === events[0]!.cursor),
+  );
+});
+
+void test('one turn observer timing out does not remove other observers or cancel the turn', async (t) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  t.after(() => release());
+  const f = await network(t, { kind: 'fake', run: () => gate });
+  const client = await f.connect();
+  const receipt = await client.submit('independent wait deadlines');
+  const longer = client.waitTurn(receipt.turn_id, 1500);
+  await assert.rejects(client.waitTurn(receipt.turn_id, 20), { code: 'TURN_TIMEOUT' });
+  release();
+  assert.equal((await longer).type, 'completed');
+});
+
+void test('closing a client rejects every turn observer and remains safe to repeat', async (t) => {
+  const f = await network(t);
+  const client = await f.connect();
+  const turnId = randomUUID();
+  const waits = [
+    assert.rejects(client.waitTurn(turnId, 1000), { code: 'WORKSPACE_OFFLINE' }),
+    assert.rejects(client.waitTurn(turnId, 1000), { code: 'WORKSPACE_OFFLINE' }),
+    assert.rejects(client.waitTurn(randomUUID(), 1000), { code: 'WORKSPACE_OFFLINE' }),
+  ];
+  client.close();
+  client.close();
+  waits.push(assert.rejects(client.waitTurn(randomUUID(), 1000), { code: 'WORKSPACE_OFFLINE' }));
+  await Promise.all(waits);
+});
+
+void test('turn waits reject invalid deadlines and bound observers without leaking expired slots', async (t) => {
+  const f = await network(t);
+  const client = await f.connect();
+  const turnId = randomUUID();
+  for (const timeout of [0, -1, NaN, Infinity, 0.5, 2_147_483_648]) {
+    await assert.rejects(client.waitTurn(turnId, timeout), { code: 'INVALID_ARGUMENT' });
+  }
+  const expiring = assert.rejects(client.waitTurn(turnId, 20), { code: 'TURN_TIMEOUT' });
+  const pending = Array.from({ length: 63 }, () =>
+    assert.rejects(client.waitTurn(turnId, 1000), { code: 'WORKSPACE_OFFLINE' }),
+  );
+  await assert.rejects(client.waitTurn(turnId, 1000), { code: 'RESOURCE_LIMIT' });
+  await expiring;
+  pending.push(assert.rejects(client.waitTurn(turnId, 1000), { code: 'WORKSPACE_OFFLINE' }));
+  client.close();
+  await Promise.all(pending);
+});
