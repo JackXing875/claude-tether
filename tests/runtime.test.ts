@@ -114,3 +114,15 @@ void test('missing result, remote tools, and unexpected runtime session fail clo
     code: 'RUNTIME_PROTOCOL',
   });
 });
+
+void test('duplicate initialization and conversation events after completion fail closed', () => {
+  const decoder = new ClaudeEventDecoder(() => {});
+  send(decoder, init);
+  assert.throws(() => send(decoder, init), { code: 'RUNTIME_PROTOCOL' });
+  send(decoder, result);
+  assert.throws(
+    () =>
+      send(decoder, { type: 'assistant', message: { content: [{ type: 'text', text: 'late' }] } }),
+    { code: 'RUNTIME_PROTOCOL' },
+  );
+});

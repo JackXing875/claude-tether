@@ -2013,3 +2013,9 @@ VPS 约 1 GB RAM，低于官方列出的 4 GB 系统要求。当前只证明安�
 [架构](docs/ARCHITECTURE.md)、[贡献指南](CONTRIBUTING.md)、[测试说明](docs/TESTING.md)、[发布流程](docs/RELEASING.md)与[路线图](docs/ROADMAP.md)承接后续维护。`private: true` 只防止误发布 npm，并不改变 GPL 开源许可。
 
 H1—H5 不变，真实官方订阅链路仍是独立退出条件。工程化和离线 CI 不证明真实 Claude 可用；当前明确要求 `--runtime fake`，不会自动回退或冒充已完成模型联调。官方登录仍由用户本人完成，凭据不进入仓库和 CI。
+
+## 32. 候选官方运行时闭环（离线验证阶段）
+
+在开源基础分支之上补齐 runtime supervisor、独立 MCP stdio worker、每轮私有能力凭据与会话映射。每个工具调用校验完整绑定和 turn，初始化工具集合确认前禁止派发；断开的调用不会自动重连重放。取消或失败后停止 CLI/MCP 进程组、取消本地工具、等待在途结果并清理短期凭据。明确 runtime UUID 保存在私有 SQLite，下一轮使用 `--resume`，异常中断要求先显式恢复 bridge 会话。
+
+验证使用自建替身 CLI、真实 MCP SDK/子进程和真实本地文件/进程。替身主动返回假的订阅状态，仅用于测试启动与协议；没有调用官方模型，也不证明真实账号可用。公开 CLI 继续只启用 fake runtime，待用户官方登录与 P0 完成后再开放真实运行路径。实现与证据边界见 [架构](docs/ARCHITECTURE.md)和[测试说明](docs/TESTING.md)。

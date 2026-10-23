@@ -18,8 +18,10 @@ Tests use actual temporary files, child processes, SQLite, authenticated loopbac
 
 CI tests the minimum supported Node and current Node 24.x on Ubuntu 24.04. WSL behavior is also checked locally; GitHub's Ubuntu runner does not emulate WSL or native Windows. A stable `CI / required` aggregate job is suitable for a branch protection rule if the maintainer chooses to enable one; adding the workflow does not itself enable branch protection.
 
-Coverage includes core packages. It is a diagnostic artifact, not a maturity score. The unexecuted official CLI subprocess lowers coverage and remains a separate real-account gate. An aggregate percentage cannot replace permission/recovery regression tests; do not add implementation-mirroring tests just to raise it.
+Coverage includes core packages. It is a diagnostic artifact, not a maturity score. The supervisor subprocess paths are exercised with a synthetic CLI; the official CLI remains a separate real-account gate. An aggregate percentage cannot replace permission/recovery regression tests; do not add implementation-mirroring tests just to raise it.
 
 `test:package` needs registry access to install dependencies. It writes a tarball and checksum under ignored `artifacts/`, then removes its temporary installation and demo directories. There are no install/postinstall hooks in the distributable. CI produces artifacts but does not publish to npm or contact Claude.
 
 The [first prototype report](TEST-REPORT.md) and [network smoke JSON](evidence/p1-network-smoke.json) are historical snapshots. They prove that particular fake-runtime experiment, not today's real-runtime compatibility. Current checks are visible on the exact commit's [GitHub Actions page](https://github.com/JackXing875/claude-tether/actions/workflows/ci.yml).
+
+Candidate-runtime tests launch a synthetic CLI executable, the actual MCP worker subprocess, the authenticated relay and the real local host. They verify local read/edit/test effects, transcript UUID mapping across supervisor restarts, explicit recovery after interruptions, credential-source rejection, invalid remote tool sets, cancellation of an active local process, timeout, and capability cleanup. Runtime-channel tests reject wrong secrets, stale bindings/turns, pre-initialization calls and extra connections, and prove dropped in-flight calls do not reconnect or replay.

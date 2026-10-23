@@ -11,6 +11,9 @@ flowchart TD
   Client --> Transport[transport]
   Client --> Host[local-host]
   Relay --> Runtime[runtime-adapter]
+  Runtime --> Channel[runtime-channel]
+  Channel --> Transport
+  Runtime --> Storage
   Relay --> Transport
   Relay --> Storage[storage]
   Host --> Tools[local-tools]
@@ -60,4 +63,14 @@ The relay can see transmitted project content, but cannot authorize local operat
 
 One SQLite lease prevents two processes from owning the same state. SIGINT/SIGTERM stop a foreground relay; disconnect cancels local tasks. Client and tool host currently share a process. A daemon, persistent UI attachment, full TUI and Windows Job Objects require separate lifecycle designs.
 
-The official CLI is neither patched nor bundled. Its candidate launch uses a fixed version, explicit bridge tools, strict MCP configuration, explicit session UUIDs and a restricted environment. `--bare` is not used because the planned login is personal Pro/Max. The missing supervisor-to-MCP IPC and actual subscription evidence are tracked in [ROADMAP.md](ROADMAP.md), not hidden behind an implicit fallback to the fake agent.
+The official CLI is neither patched nor bundled. Its candidate launch uses a fixed version, explicit bridge tools, strict MCP configuration, explicit session UUIDs and a restricted environment. `--bare` is not used because the planned login is personal Pro/Max. The supervisor-to-MCP bridge now has synthetic subprocess evidence. Real subscription evidence remains a gate in [ROADMAP.md](ROADMAP.md); the public CLI does not enable Claude or silently fall back to fake.
+
+## Candidate runtime lifecycle
+
+`ClaudeRuntime` is exported from `claude-tether/runtime` for integration work. Its application supplies an absolute installed MCP worker entrypoint, a dedicated infrastructure state directory and the official executable. It verifies the subscription auth method and pinned CLI version, starts each turn in an isolated process group, and connects a real MCP stdio worker to an authenticated numeric-loopback channel. The capability JSON lives in a private per-turn directory and is removed at teardown; it is never placed in argv as a token.
+
+Every channel call carries the complete binding and turn ID. Calls are blocked until the official-style initialization names the expected runtime session and complete local tool set. A channel accepts one connection and does not reconnect/replay lost calls. Dropping an in-flight call cancels its local work. Shutdown reaps the CLI/MCP process group, cancels local tasks, drains dispatches, closes the channel and removes ephemeral files.
+
+A separate private SQLite store maps a bridge session to an explicit runtime UUID. Successful next turns use `--resume UUID`; no `--continue` inference is used. After an interrupted turn, an increased worker epoch from explicit bridge reconnect is required. Unconfirmed initialization remains blocked for inspection because a transcript may already exist. The relay's operation reconciliation runs before this runtime resume.
+
+The synthetic test CLI returns a deliberately fake auth summary, then uses the actual MCP SDK and worker subprocess. Those tests prove transport/lifecycle behavior, not Anthropic authentication, entitlement, model behavior or current CLI flags. The public `tether server` remains fake-only until the real P0 gate is satisfied.

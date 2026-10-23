@@ -16,8 +16,8 @@ The project is a development alpha. “Open-source engineering foundation” and
 This gate requires the owner's official subscription login on the dedicated VPS account. No credentials should be pasted into issues, chat, CI or git.
 
 - Record the pinned official CLI's initialization, stream, tool and terminal behavior using the existing two-turn probe.
-- Implement authenticated, per-worker MCP-to-supervisor IPC with explicit binding, cancellation, bounded requests and teardown.
-- Persist runtime session mapping; prove a second turn and explicit resume use the intended conversation.
+- Candidate authenticated per-turn MCP-to-supervisor IPC is implemented and tested with a synthetic CLI and real MCP subprocess. Verify the same boundary with official Claude before enabling the public runtime.
+- Runtime session mapping and explicit resume survive restart in synthetic subprocess tests. Confirm the pinned official CLI uses the same intended conversation and transcript semantics.
 - Verify a real model reads, edits and tests only the local project; confirm remote built-in tools remain unavailable.
 - Test denial, disconnect during tool execution, cancellation and restart without duplicated effects.
 - Measure real CLI memory/latency on the VPS. The previously inspected ~1 GiB server is below Claude's documented 4 GiB baseline; the offline transport result is not evidence of real-runtime capacity.

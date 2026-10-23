@@ -102,8 +102,8 @@
       "import": "./dist/packages/mcp-bridge/index.js"
     },
     "./runtime": {
-      "types": "./dist/packages/runtime-adapter/types.d.ts",
-      "import": "./dist/packages/runtime-adapter/types.js"
+      "types": "./dist/packages/runtime-adapter/index.d.ts",
+      "import": "./dist/packages/runtime-adapter/index.js"
     }
   }
 }

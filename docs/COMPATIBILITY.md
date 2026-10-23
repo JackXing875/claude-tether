@@ -2,19 +2,19 @@
 
 记录日期：2026-10-23（Asia/Shanghai）。本项目版本 0.1.0-alpha.1，协议 1.0。
 
-| 组件/平台                 | 证据                                                                                                   |
-| ------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Node.js                   | 本地和 VPS 均运行 v24.14.0                                                                             |
-| TypeScript                | 固定 6.0.3，与 typed ESLint 兼容，严格类型检查与构建                                                   |
-| ws / zod / MCP SDK / diff | 8.22.0 / 4.6.7 / 1.32.1 / 8.0.4；lockfile                                                              |
-| 本地                      | Linux x64 / WSL2；真实文件、命令、进程组、SQLite、WebSocket/WSS 测试                                   |
-| VPS                       | Ubuntu 26.04.1 x64；1 核、约 950 MiB RAM、约 2.3 GiB swap                                              |
-| 官方 Claude Code          | 两端 2.1.267；VPS 经官方安装器安装，版本检查通过                                                       |
-| 真实订阅请求              | 未运行；用户要求稍后登录                                                                               |
-| MCP                       | 官方 SDK 的 tools/list、tools/call 与本地执行端集成通过；Claude → MCP → supervisor 的真实 IPC 尚未连接 |
-| CLI NDJSON                | 自建合成 fixture 通过；没有将其冒充官方实录                                                            |
-| Windows 原生              | 未实现/未验收；通过 Windows SSH 连接 VPS 不等于客户端支持 Windows                                      |
-| GitHub CI                 | GitHub main 的初始 CI 已通过；当前工程化改动以对应提交的 Actions 结果为准，见 [测试说明](TESTING.md)   |
+| 组件/平台                 | 证据                                                                                                                                                            |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Node.js                   | 本地和 VPS 均运行 v24.14.0                                                                                                                                      |
+| TypeScript                | 固定 6.0.3，与 typed ESLint 兼容，严格类型检查与构建                                                                                                            |
+| ws / zod / MCP SDK / diff | 8.22.0 / 4.6.7 / 1.32.1 / 8.0.4；lockfile                                                                                                                       |
+| 本地                      | Linux x64 / WSL2；真实文件、命令、进程组、SQLite、WebSocket/WSS 测试                                                                                            |
+| VPS                       | Ubuntu 26.04.1 x64；1 核、约 950 MiB RAM、约 2.3 GiB swap                                                                                                       |
+| 官方 Claude Code          | 两端 2.1.267；VPS 经官方安装器安装，版本检查通过                                                                                                                |
+| 真实订阅请求              | 未运行；用户要求稍后登录                                                                                                                                        |
+| MCP                       | 官方 SDK 的 tools/list、tools/call 与本地执行端集成通过；候选 supervisor → MCP 子进程 → relay → 本地执行链路已使用替身 CLI 验证；官方 Claude 的真实调用仍待验证 |
+| CLI NDJSON                | 自建合成 fixture 通过；没有将其冒充官方实录                                                                                                                     |
+| Windows 原生              | 未实现/未验收；通过 Windows SSH 连接 VPS 不等于客户端支持 Windows                                                                                               |
+| GitHub CI                 | GitHub main 的初始 CI 已通过；当前工程化改动以对应提交的 Actions 结果为准，见 [测试说明](TESTING.md)                                                            |
 
 | 功能                       | 当前支持                                                               |
 | -------------------------- | ---------------------------------------------------------------------- |

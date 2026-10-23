@@ -13,7 +13,8 @@ const allowed = {
   'operation-journal': ['protocol', 'storage'],
   'local-host': ['protocol', 'local-tools', 'operation-journal'],
   'mcp-bridge': ['protocol'],
-  'runtime-adapter': ['protocol'],
+  'runtime-adapter': ['protocol', 'config', 'storage', 'runtime-channel'],
+  'runtime-channel': ['protocol', 'transport'],
   relay: ['protocol', 'transport', 'runtime-adapter', 'storage'],
   client: ['protocol', 'transport', 'local-host'],
 };

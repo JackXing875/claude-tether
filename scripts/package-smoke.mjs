@@ -40,6 +40,8 @@ try {
     'bin/tether.mjs',
     'dist/apps/cli/index.js',
     'dist/packages/client/index.d.ts',
+    'dist/apps/mcp-bridge/worker.js',
+    'dist/packages/runtime-adapter/supervisor.js',
     'packages/client/index.ts',
     'LICENSE',
     'CONTRIBUTING.md',
@@ -74,7 +76,7 @@ try {
     [
       '--input-type=module',
       '-e',
-      "const a=await import('claude-tether/client'); const b=await import('claude-tether/relay'); if(!a.BridgeClient||!b.RelayServer)process.exit(1);",
+      "const a=await import('claude-tether/client'); const b=await import('claude-tether/relay'); const c=await import('claude-tether/runtime'); if(!a.BridgeClient||!b.RelayServer||!c.ClaudeRuntime)process.exit(1);",
     ],
     { cwd: installed },
   );

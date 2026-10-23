@@ -290,9 +290,21 @@ export class RelayServer {
     };
     try {
       await this.runtime.run({
+        binding,
+        turnId: turn,
         prompt,
         signal: controller.signal,
         text: (text) => emit('text', { text }),
+        cancelTools: () => {
+          try {
+            connection.peer.notify('operation.cancel_turn', {
+              session_id: binding.session_id,
+              turn_id: turn,
+            });
+          } catch {
+            /* Disconnect already cancels local work. */
+          }
+        },
         execute: async (tool, input) => {
           if (controller.signal.aborted)
             throw new BridgeError('CANCELLED', 'Turn cancelled before dispatch.');

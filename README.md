@@ -7,7 +7,7 @@ Run the Claude Code agent on your VPS while keeping project tools and approval o
 
 [中文](README.zh-CN.md) · [Quick start](docs/QUICKSTART.md) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md)
 
-**Development alpha.** The working end-to-end path currently uses an offline, deterministic agent. The official Claude CLI adapter and subscription probe exist, but a real Claude conversation cannot yet run through the relay. See the [release gates](docs/ROADMAP.md). This is an independent project, not affiliated with Anthropic.
+**Development alpha.** The working end-to-end path currently uses an offline, deterministic agent. The candidate official CLI supervisor, MCP subprocess bridge and subscription probe exist, but official account behavior has not been verified; the public CLI still only enables the fake runtime. See the [release gates](docs/ROADMAP.md). This is an independent project, not affiliated with Anthropic.
 
 ## Try it in two minutes
 

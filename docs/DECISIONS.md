@@ -9,7 +9,7 @@ START.md 的 H1—H5 保持不变：官方主进程在 VPS；个人 Pro/Max；�
 | SQLite      | node:sqlite、WAL、synchronous=FULL；独立 lease 数据库持有 OS 锁，阻止同一状态库被多个执行端同时打开                                      |
 | 组件划分    | 核心实现位于 packages，应用只负责组合；导入边界由脚本检查；CLI 和 local-host 同进程，先不引入后台 daemon 与本机 UI IPC                   |
 | MCP         | 固定 @modelcontextprotocol/sdk 1.32.1，用维护分支验证 stdio/tool 契约；正式维护前评估 v2 升级                                            |
-| 运行时接口  | 只读 P0 probe 使用一轮一个 CLI 进程和明确 --resume UUID；长驻输入/中断留待实测                                                           |
+| 运行时接口  | 候选 supervisor 与 P0 probe 使用一轮一个 CLI 进程、明确 --resume UUID；已接入私有 MCP IPC 并进行替身进程测试，官方行为留待实测           |
 | 远端隔离    | 专用 claude-relay 非 root 账号、独立目录；空内置工具清单、严格 MCP 配置、空 setting-sources、明确工具名称；不使用 --bare                 |
 | 文件语义    | 128 KiB UTF-8，保留已有 BOM/CRLF；P1 拒绝全部 symlink，写入前再验证内容 hash；不宣称抵御任意外部进程的路径竞争                           |
 | 命令语义    | 仅 exec/前台/非交互，最长 60 秒；不自动启动 shell，不支持 env 覆盖、PTY 或后台标志                                                       |

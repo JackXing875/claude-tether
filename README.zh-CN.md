@@ -4,7 +4,7 @@
 
 让官方 Claude Code Agent 在自己的 VPS 上运行，把项目文件操作、命令和最终授权留在自己的电脑。
 
-**当前为开发 alpha，尚不能作为日常 Claude 中转站。** 可运行的端到端链路使用离线 Fake Agent；官方 CLI 适配器和订阅探针已实现，真实 Claude 会话到本地工具的完整链路尚未完成。具体退出条件见[路线图](docs/ROADMAP.md)。本项目与 Anthropic 无隶属关系。
+**当前为开发 alpha，尚不能作为日常 Claude 中转站。** 可运行的端到端链路使用离线 Fake Agent；候选官方 CLI supervisor、MCP 子进程桥和订阅探针已实现，并以替身 CLI 测试；真实官方账号行为尚未验证，公开 CLI 仍仅启用 fake runtime。具体退出条件见[路线图](docs/ROADMAP.md)。本项目与 Anthropic 无隶属关系。
 
 ## 两分钟体验
 

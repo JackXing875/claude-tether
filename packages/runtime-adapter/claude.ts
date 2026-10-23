@@ -130,7 +130,15 @@ export class ClaudeEventDecoder {
     }
     if (!message || typeof message !== 'object' || typeof message.type !== 'string')
       throw new BridgeError('RUNTIME_PROTOCOL', 'Runtime event has no type.');
+    if (this.finished && ['assistant', 'stream_event', 'result'].includes(message.type)) {
+      throw new BridgeError(
+        'RUNTIME_PROTOCOL',
+        'Runtime emitted conversation data after its terminal result.',
+      );
+    }
     if (message.type === 'system' && message.subtype === 'init') {
+      if (this.initialized)
+        throw new BridgeError('RUNTIME_PROTOCOL', 'Runtime initialized more than once.');
       const tools = message.tools;
       if (
         !Array.isArray(tools) ||
@@ -222,7 +230,7 @@ export class ClaudeEventDecoder {
   }
 }
 
-/** One-turn subprocess for P0 probes; not enabled in the public relay yet. */
+/** One-turn subprocess shared by P0 probes and the candidate supervisor. */
 export async function probeClaude(options: {
   executable: string;
   cwd: string;
@@ -231,7 +239,11 @@ export async function probeClaude(options: {
   prompt: string;
   signal: AbortSignal;
   onEvent: (event: RuntimeEvent) => void;
+  timeoutMs?: number;
 }): Promise<void> {
+  const timeoutMs = options.timeoutMs ?? 120_000;
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 600_000)
+    throw new BridgeError('INVALID_PARAMS', 'Runtime timeout must be between 1 and 600000 ms.');
   const env = workerEnvironment(options.env);
   const version = spawnSync(options.executable, ['--version'], {
     env,
@@ -265,7 +277,7 @@ export async function probeClaude(options: {
     const timer = setTimeout(() => {
       error = new BridgeError('RUNTIME_TIMEOUT', 'P0 runtime probe timed out.');
       kill();
-    }, 120_000);
+    }, timeoutMs);
     options.signal.addEventListener('abort', kill, { once: true });
     child.stdout.on('data', (bytes: Buffer) => {
       try {
@@ -282,6 +294,7 @@ export async function probeClaude(options: {
     child.on('error', () => {
       error = new BridgeError('RUNTIME_START_FAILED', 'Could not start the official CLI.');
     });
+    child.once('exit', kill); // Reap remaining MCP children in this private process group.
     child.on('close', (code) => {
       clearTimeout(timer);
       options.signal.removeEventListener('abort', kill);
