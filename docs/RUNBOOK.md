@@ -33,9 +33,9 @@ cd your-project
 claude-tether
 ```
 
-Setup checks the local Claude executable and the SSH/SOCKS listener. It saves preferences only after those checks pass, using an atomic replacement and a private file mode. It does not make a model request or prove that the VPS can reach every upstream destination. Existing working preferences survive a failed setup.
+Setup checks bubblewrap/user namespace support, the local Claude executable inside isolation, and the SSH/SOCKS listener. It saves preferences only after those checks pass, using an atomic replacement and a private file mode. It does not make a model request or prove that the VPS can reach every upstream destination. Existing working preferences survive a failed setup.
 
-To change the default, run setup again. To override it temporarily, use `--ssh`, `--ssh-config`, or `--claude` on a normal launch. A temporary override does not modify saved preferences.
+To change the default, run setup again. To override it temporarily, use `--ssh`, `--ssh-config`, `--claude`, `--network`, `--ccproxy-port` or `--no-ccproxy` on a normal launch. A temporary override does not modify saved preferences.
 
 ```bash
 claude-tether setup my-vps --ssh-config ~/.ssh/tether-config
@@ -58,9 +58,30 @@ claude-tether -- --resume SESSION_ID
 
 The official local CLI manages authentication and refresh. Tether does not export credentials or clear existing API key/provider settings. Confirm your account and authentication method in Claude itself.
 
-A browser opened for authorization does not inherit the CLI's proxy environment. If the authorization page cannot load, use the browser's supported network configuration. Do not paste authorization codes or tokens into issue reports or Tether settings.
+A browser opened for authorization does not inherit the CLI's proxy environment. Default isolation disables Windows interop and separates host loopback. Use the official manual URL/code login flow if offered; if a browser callback requires host loopback, explicitly use `claude-tether --network proxy -- auth login` for that login and then return to isolated mode. If the authorization page cannot load, use the browser's supported network configuration. Do not paste authorization codes or tokens into issue reports or Tether settings.
 
 An earlier VPS-based prototype may have left software on the server. That installation is not used by this version; removal is a separate administrative action. Local Claude authentication is independent of any login saved on the VPS.
+
+### Separating a personal Pro login
+
+In the 2.1.267 live test, `CLAUDE_CONFIG_DIR` alone still inherited an authentication profile under `~/.config/anthropic`. Isolate `XDG_CONFIG_HOME` as well when you need to verify a separate login. This also changes where Tether looks for preferences, so pass the SSH destination explicitly or run setup again in that environment. Keep the same environment for login and daily use.
+
+```bash
+claude-pro() (
+  unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL
+  unset CLAUDE_CODE_OAUTH_TOKEN CLAUDE_CODE_API_KEY
+  unset CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_USE_VERTEX CLAUDE_CODE_USE_FOUNDRY
+  export CLAUDE_CONFIG_DIR="$HOME/.config/claude-tether/pro/claude"
+  export XDG_CONFIG_HOME="$HOME/.config/claude-tether/pro/xdg"
+  claude-tether --ssh my-vps -- "$@"
+)
+claude-pro auth login --claudeai
+claude-pro auth status
+```
+
+Confirm `claude.ai` and the expected subscription in the official status output. Project and managed settings still apply. Do not move credentials from the VPS or overwrite an existing Claude profile to troubleshoot login.
+
+For WSL, the Linux `ssh` executable needs its own usable configuration and host trust. A Windows SSH alias is not automatically available in WSL. Passing `--ssh-config` selects a Linux-readable configuration; it does not change the SSH executable. Windows `ssh.exe -D` also listens in Windows' network namespace, which was not reachable through WSL loopback in the tested NAT configuration. The live validation used native Linux OpenSSH and a dedicated forwarding key.
 
 ## Connection recovery
 
@@ -74,9 +95,11 @@ Normal terminal Ctrl+C remains available to Claude. Exiting Claude closes Tether
 
 ## Network scope
 
-Tether sets upper- and lower-case HTTP/HTTPS proxy variables only in Claude's process environment. Claude's child tools inherit them. `NO_PROXY` is limited to localhost, 127.0.0.1 and ::1; an inherited `NO_PROXY=*` cannot silently bypass the tunnel.
+Default `--network isolated` runs Claude and Linux child tools with loopback as their only network interface. Proxy-aware HTTP and HTTPS use private Unix bridges and SSH. Settings that override proxy variables can cause connection failures but cannot restore direct external IP connectivity. Raw sockets, direct DNS and UDP are blocked. This is not a system-wide VPN or a hostile-code sandbox.
 
-The proxy accepts HTTPS CONNECT only. Ordinary HTTP receives `405`; UDP, browsers and tools that ignore proxy variables are not routed. This is not a system-wide VPN. Destination DNS for tunneled connections is resolved through the VPS. TLS stays between the local client and its destination.
+For programs requiring host loopback, Windows interop or unsupported protocols, see [network modes and compatibility](NETWORK.md). Explicit `--network proxy` retains the older environment-only mode, where project settings can bypass the proxy. No automatic fallback occurs.
+
+The optional `--ccproxy-port` connects a gateway on VPS loopback over SSH; read its [experimental limitations](CCPROXY.md) before use. It is disabled unless selected and is not required for `/model` or local tools.
 
 ## Troubleshooting
 
@@ -87,15 +110,17 @@ The proxy accepts HTTPS CONNECT only. Ordinary HTTP receives `405`; UDP, browser
 | Setup never becomes ready | Check keys/ssh-agent, known_hosts, the SSH port and network reachability; startup stops after 30 seconds |
 | SSH disconnected | Allow the reconnect loop to recover; the local Claude process stays alive |
 | Proxy `502` | A tunnel or destination connection could not be established; inspect SSH and VPS outbound access |
-| Proxy `405` | The application attempted ordinary HTTP, which this beta does not support |
+| Network isolation unavailable | Install bubblewrap 0.9+ and check the distribution user-namespace policy; see NETWORK.md |
+| A tool reports network unreachable or cannot reach host localhost | Check isolated-mode compatibility; do not assume a VPS outage |
+| ccproxy connection refused/prohibited | Check the gateway loopback listener and SSH key forwarding restrictions |
 | Model output is interrupted | Use Claude's own retry/session recovery; Tether cannot resume a broken TCP stream |
-| Invalid settings | Inspect the named local preferences file; it accepts only `ssh`, `sshConfig` and `claude` strings |
+| Invalid settings | Inspect the named local preferences file; it accepts `ssh`, `sshConfig`, `claude`, `network` (isolated/proxy) and `ccproxyPort` strings |
 
 Tether logs connection state and OpenSSH's diagnostics. It does not log model request bodies or credentials. Redact hostnames, usernames and local paths before sharing diagnostic output.
 
 ## Upgrade and uninstall
 
-Install the tarball from a newer GitHub prerelease using the same global npm command shown in its release notes. Saved preferences remain outside the package.
+Install the tarball from a newer GitHub prerelease using the same global npm command shown in its release notes. Saved preferences remain outside the package. Upgrading from 0.2 selects isolated mode unless `network: "proxy"` was explicitly saved; install bubblewrap first. The distribution includes the full operating and validation documentation.
 
 ```bash
 npm uninstall --global claude-tether

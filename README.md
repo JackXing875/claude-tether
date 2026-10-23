@@ -4,12 +4,13 @@
 
 Claude Tether is a lightweight launcher for the official Claude Code CLI. It connects through your VPS over SSH while keeping Claude, your project files, tools, permissions, and sessions on your own machine.
 
-**Beta: `v0.2.0-beta.1`** · [Release notes](docs/releases/v0.2.0-beta.1.md) · [Operations guide](docs/RUNBOOK.md) · [Contributing](CONTRIBUTING.md)
+**Beta: `v0.3.0-beta.1`** · [Release notes](docs/releases/v0.3.0-beta.1.md) · [Operations guide](docs/RUNBOOK.md) · [Contributing](CONTRIBUTING.md)
 
 ## Quick start
 
 You need:
 
+- **Linux/WSL2 with bubblewrap 0.9+** and working unprivileged user namespaces (`sudo apt-get install bubblewrap` on Ubuntu).
 - **Node.js 24.14 or later in the 24.x line** and npm.
 - The [official Claude Code CLI](https://code.claude.com/docs/en/setup), installed locally.
 - An OpenSSH client and a VPS you can reach using an SSH key or ssh-agent. The VPS must allow TCP forwarding.
@@ -19,7 +20,7 @@ If `claude --version` and key-based `ssh my-vps` already work, no additional ser
 **1. Install the beta**
 
 ```bash
-npm install --global https://github.com/JackXing875/claude-tether/releases/download/v0.2.0-beta.1/claude-tether-0.2.0-beta.1.tgz
+npm install --global https://github.com/JackXing875/claude-tether/releases/download/v0.3.0-beta.1/claude-tether-0.3.0-beta.1.tgz
 ```
 
 The release contains compiled JavaScript and source code. End users do not need TypeScript, Git, a database, or a build step. Beta packages are distributed through GitHub Releases; this command does not rely on an npm registry publication.
@@ -30,7 +31,7 @@ The release contains compiled JavaScript and source code. End users do not need 
 claude-tether setup my-vps
 ```
 
-Setup checks the local Claude executable and establishes an authenticated SSH tunnel before saving your preferences. It does not store passwords, private keys, or Claude credentials. You can also run `claude-tether setup` and enter the destination when prompted.
+Setup checks network isolation and the local Claude executable, then establishes an authenticated SSH tunnel before saving your preferences. It does not store passwords, private keys, or Claude credentials. You can also run `claude-tether setup` and enter the destination when prompted.
 
 **3. Use it from your project**
 
@@ -52,6 +53,9 @@ That is the everyday command. The official Claude interface opens in your curren
 | `claude-tether -- --resume SESSION_ID` | Resume a specific Claude session |
 | `claude-tether -- auth login` | Run the official local login flow through the tunnel |
 | `claude-tether --ssh another-vps` | Override the destination for one invocation |
+| `claude-tether --network proxy` | Explicit compatibility mode; settings may bypass the proxy |
+| `claude-tether --ccproxy-port 4000` | Experimental SSH access to a VPS-local ccproxy gateway |
+| `claude-tether --no-ccproxy` | Disable a saved experimental gateway |
 | `claude-tether --help` | Show all options |
 
 Arguments after `--` are passed to Claude unchanged. Claude's terminal interface, working directory, permissions, project configuration, and exit status are preserved.
@@ -67,16 +71,16 @@ Preferences are saved in `~/.config/claude-tether/config.json`, or under `$XDG_C
 ## How it works
 
 ```text
-Your machine                                      Your VPS
-
-Official Claude Code → loopback CONNECT proxy → SSH → sshd → Anthropic
-  projects, tools,        stream forwarding          TCP exit
-  login, sessions
+Linux/WSL network namespace (loopback only)       Host               VPS
+Official Claude + tools → local proxy → private Unix bridge → SSH → sshd → destination
+  project files, login, sessions stay local
 ```
 
-Tether uses Node's built-in modules and OpenSSH. It has **zero npm runtime dependencies**. The VPS only needs sshd; it does not run Claude Code, a custom application service, a project checkout, or a database.
+The default `isolated` mode gives Claude and its Linux descendants a network namespace with no external IP route. A private Unix socket connects its HTTP(S) proxy to the host's SSH tunnel. Overriding proxy settings cannot restore direct IP access. Exiting the launcher also stops its isolated descendants, including detached tools and SSH.
 
-TLS remains between the local client and the destination. Tether and the VPS do not terminate TLS or parse model messages. The VPS resolves destination names and opens outbound TCP connections. SSH host verification and normal TLS certificate verification remain enabled.
+Tether has **zero npm runtime dependencies**. Isolation uses the system `bwrap` executable; the default VPS path still needs only sshd. No root daemon, global firewall change or TLS interception is required.
+
+For HTTPS through the default SSH transport, TLS remains between the local client and the destination. Destination DNS is resolved on the VPS. Ordinary HTTP is also supported, with its normal lack of end-to-end encryption. The optional ccproxy path terminates API requests at the gateway; see its separate [experimental status](docs/CCPROXY.md).
 
 ## Connection behavior
 
@@ -90,15 +94,19 @@ This improves connection management without promising uninterrupted responses or
 
 ## Authentication and network scope
 
-Authentication remains with the official local Claude CLI. Tether does not export tokens, change the API base URL, or select a different billing method. Existing API key, provider, or managed settings still apply; use Claude's own account information to confirm the active authentication method.
+Authentication remains with the official local Claude CLI. Tether does not export tokens or select a billing method. Existing API key, provider and managed settings still apply; check the active account in Claude. Only explicitly enabling `--ccproxy-port` changes `ANTHROPIC_BASE_URL` to an SSH-backed local gateway.
 
-Proxy variables are set only for Claude and its descendants. Tools that honor those variables may also send HTTPS traffic through the VPS. Localhost traffic bypasses the proxy; browsers, UDP, and programs that ignore proxy variables are outside its scope. The proxy supports HTTPS CONNECT only; ordinary HTTP requests receive `405`.
+Default isolation routes proxy-aware HTTP(S) traffic through the VPS and **blocks other external IP traffic**. This is not transparent forwarding of every protocol: UDP, direct sockets and proxy-unaware tools cannot reach the Internet. Tools using host loopback services, Windows interop, a host SSH agent, or browser callbacks may need configuration changes. Existing host browsers and other applications remain outside the namespace. See [network modes and compatibility](docs/NETWORK.md).
 
-The browser opened during login does not automatically inherit the CLI's proxy. The [operations guide](docs/RUNBOOK.md) covers first-time SSH access, login, and troubleshooting.
+`--network proxy` explicitly restores the old environment-only mode. It works without bubblewrap, but settings can override its routing. Tether never silently falls back to that mode. On macOS/Windows native, only this unverified compatibility mode is available.
+
+The [operations guide](docs/RUNBOOK.md) covers SSH setup, separate Pro profiles, login and troubleshooting.
 
 ## Beta status
 
-Linux is the validated platform. WSL uses the same Linux workflow, but Windows native and macOS have not been tested. Tests exercise real local OpenSSH and TLS services, including reconnection and streaming failures. **Live Claude account requests, deployment to a user's VPS, and long-duration network behavior have not yet been validated.** See the [test report](docs/TEST-REPORT.md).
+Linux/WSL2 isolation has passed real Pro calls with local tools, MCP/hooks, Sonnet-to-Opus session resume and native `/model`; see the [new validation report](docs/ISOLATED-LIVE-REPORT.md) and [automated coverage](docs/TEST-REPORT.md). Longer use and active model generation during outages remain unverified.
+
+An optional ccproxy connector preserves HTTP bytes through SSH. Upstream compatibility was tested with synthetic credentials; **real Pro use through ccproxy is not validated or enabled by default**. Its current logging and TLS defaults need further work before routine use. No identity spoofing is included. Network isolation and fingerprint changes cannot establish immunity from account restrictions.
 
 This is an independent project, not an Anthropic product or an officially endorsed integration.
 
@@ -112,7 +120,7 @@ npm test
 npm run test:package
 ```
 
-Development tests require OpenSSH client/server binaries and OpenSSL. They create isolated local fixtures and do not use your Claude account or personal SSH settings. See [CONTRIBUTING.md](CONTRIBUTING.md) for prerequisites and the release process.
+Development tests require OpenSSH client/server binaries, OpenSSL and bubblewrap with user namespaces enabled. They create isolated local fixtures and do not use your Claude account or personal SSH settings. See [CONTRIBUTING.md](CONTRIBUTING.md) for prerequisites and the release process.
 
 ## License
 

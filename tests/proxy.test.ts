@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
-import { get } from 'node:http';
+import { createServer as httpServer, get, request } from 'node:http';
 import { createConnection, createServer } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
 import test from 'node:test';
@@ -68,7 +68,7 @@ test('upstream EOF drains a large response to a slow client without truncation',
   assert.deepEqual(Buffer.concat(chunks), expected);
 });
 
-test('invalid authorities and ordinary HTTP never reach the upstream', async t => {
+test('invalid authorities and relative HTTP URLs never reach the upstream', async t => {
   const proxy = await startProxy(async () => { throw new Error('Must not dial'); });
   t.after(proxy.close);
   for (const target of ['user:password@example.com:443', 'example.com:0', 'example.com:65536', 'example.com:443/path']) {
@@ -76,7 +76,41 @@ test('invalid authorities and ordinary HTTP never reach the upstream', async t =
     assert.equal(result.status, 400); result.socket.destroy();
   }
   const status = await new Promise<number>(resolve => get(proxy.url, res => { res.resume(); resolve(res.statusCode!); }));
-  assert.equal(status, 405);
+  assert.equal(status, 400);
+});
+
+test('ordinary HTTP streams through the VPS dialer and removes hop-by-hop credentials', async t => {
+  let calls = 0;
+  const expected = Buffer.alloc(1024 * 1024, 'x');
+  const port = await listen(t, httpServer((req, res) => {
+    assert.equal(req.url, '/stream?x=1');
+    assert.equal(req.headers.host, 'http-origin.invalid');
+    assert.equal(req.headers['proxy-authorization'], undefined);
+    assert.equal(req.headers['x-hop'], undefined);
+    assert.equal(req.headers.authorization, 'Bearer synthetic-test');
+    res.writeHead(429, { 'content-type': 'text/event-stream', 'retry-after': '12', connection: 'close, x-hop', 'x-hop': 'removed' });
+    req.pipe(res);
+  }));
+  const proxy = await startProxy(async (host, destination) => {
+    calls++;
+    assert.equal(host, 'http-origin.invalid'); assert.equal(destination, 80);
+    const socket = createConnection({ host: '127.0.0.1', port });
+    await once(socket, 'connect'); return socket;
+  });
+  t.after(proxy.close);
+  const response = await new Promise<{ status: number; body: Buffer }>((resolve, reject) => {
+    const req = request(proxy.url, { method: 'POST', path: 'http://http-origin.invalid/stream?x=1', headers: {
+      'content-length': expected.length, authorization: 'Bearer synthetic-test',
+      'proxy-authorization': 'must-not-reach-origin', connection: 'close, x-hop', 'x-hop': 'removed',
+    } }, res => {
+      assert.equal(res.headers['retry-after'], '12'); assert.equal(res.headers['x-hop'], undefined);
+      const chunks: Buffer[] = [];
+      res.on('data', chunk => chunks.push(chunk));
+      res.on('end', () => resolve({ status: res.statusCode!, body: Buffer.concat(chunks) }));
+    });
+    req.on('error', reject); req.end(expected);
+  });
+  assert.equal(response.status, 429); assert.deepEqual(response.body, expected); assert.equal(calls, 1);
 });
 
 test('upstream failure returns 502 without retrying or leaking diagnostics', async t => {

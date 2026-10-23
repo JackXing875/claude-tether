@@ -9,7 +9,8 @@ const directory = await mkdtemp(join(tmpdir(), 'tether-package-test-'));
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 try {
   const [{ filename, files }] = JSON.parse(execFileSync(npm, ['pack', '--ignore-scripts', '--json', '--pack-destination', directory], { encoding: 'utf8' }));
-  for (const path of ['dist/src/cli.js', 'src/cli.ts', 'src/settings.ts', 'tsconfig.json', 'LICENSE']) {
+  for (const path of ['dist/src/cli.js', 'dist/src/isolated-child.js', 'src/cli.ts', 'src/settings.ts', 'tsconfig.json', 'LICENSE',
+    'docs/NETWORK.md', 'docs/CCPROXY.md', 'docs/TEST-REPORT.md', 'CONTRIBUTING.md', 'SECURITY.md', 'START.md']) {
     assert.ok(files.some(file => file.path === path), `Missing package file: ${path}`);
   }
   assert.ok(files.every(file => !/^(tests|node_modules)\//.test(file.path)));

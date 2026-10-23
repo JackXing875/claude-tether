@@ -12,6 +12,8 @@ export interface TunnelOptions {
   launch?: (args: string[]) => ChildProcess;
   retryMs?: number;
   connectTimeoutMs?: number;
+  // The isolated launcher also gives SSH a parent-death/PID namespace guard.
+  supervise?: boolean;
 }
 
 async function freePort(): Promise<number> {
@@ -84,7 +86,10 @@ export class SshTunnel {
       const port = await freePort();
       if (this.stopped.signal.aborted) break;
       const args = sshArgs(this.options.destination, port, this.options.config);
-      const child = this.options.launch?.(args) ?? spawn('ssh', args, { stdio: ['ignore', 'ignore', 'inherit'], windowsHide: true });
+      const program = this.options.supervise ? 'bwrap' : 'ssh';
+      const processArgs = this.options.supervise ? ['--unshare-user', '--unshare-pid', '--disable-userns',
+        '--cap-drop', 'ALL', '--bind', '/', '/', '--proc', '/proc', '--dev', '/dev', '--die-with-parent', '--', 'ssh', ...args] : args;
+      const child = this.options.launch?.(args) ?? spawn(program, processArgs, { stdio: ['ignore', 'ignore', 'inherit'], windowsHide: true });
       this.child = child;
       let exited = false;
       const closed = new Promise<void>(resolve => {

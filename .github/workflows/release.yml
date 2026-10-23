@@ -1,8 +1,11 @@
 name: Publish beta
 on:
   push:
+    branches: [main]
+    paths: [package.json]
     tags:
       - 'v*-beta.*'
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
@@ -10,20 +13,25 @@ concurrency:
   cancel-in-progress: false
 jobs:
   release:
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
-      - run: sudo apt-get update && sudo apt-get install -y openssh-client openssh-server openssl
+      - run: sudo apt-get update && sudo apt-get install -y openssh-client openssh-server openssl bubblewrap
       - run: sudo mkdir -p /run/sshd
+      - name: Allow user namespaces on this disposable CI runner
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: Verify version and release notes
         run: |
-          node --input-type=module -e 'import { readFileSync, accessSync } from "node:fs"; const { version } = JSON.parse(readFileSync("package.json")); if (!/^\d+\.\d+\.\d+-beta\.\d+$/.test(version) || process.env.GITHUB_REF_NAME !== "v" + version) throw new Error("Tag/version mismatch"); accessSync("docs/releases/" + process.env.GITHUB_REF_NAME + ".md");'
+          node --input-type=module -e 'import { readFileSync, accessSync, appendFileSync } from "node:fs"; const { version } = JSON.parse(readFileSync("package.json")); const tag = "v" + version; if (!/^\d+\.\d+\.\d+-beta\.\d+$/.test(version) || (process.env.GITHUB_REF_TYPE === "tag" && process.env.GITHUB_REF_NAME !== tag)) throw new Error("Tag/version mismatch"); accessSync("docs/releases/" + tag + ".md"); appendFileSync(process.env.GITHUB_ENV, "RELEASE_TAG=" + tag + "\n");'
       - run: npm ci
       - run: npm test
       - run: npm run test:package
@@ -38,6 +46,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" artifacts/*.tgz artifacts/SHA256SUMS \
-            --verify-tag --prerelease --title "Claude Tether $GITHUB_REF_NAME" \
-            --notes-file "docs/releases/$GITHUB_REF_NAME.md"
+          if git rev-parse "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            test "$(git rev-parse "$RELEASE_TAG^{commit}")" = "$GITHUB_SHA"
+          else
+            git tag "$RELEASE_TAG" "$GITHUB_SHA"
+            git push origin "refs/tags/$RELEASE_TAG"
+          fi
+          gh release create "$RELEASE_TAG" artifacts/*.tgz artifacts/SHA256SUMS \
+            --verify-tag --prerelease --title "Claude Tether $RELEASE_TAG" \
+            --notes-file "docs/releases/$RELEASE_TAG.md"
