@@ -162,6 +162,17 @@ export class RelayServer {
       connection.session = this.store.create(workspace);
       return connection.session;
     });
+    handle('session.list', (raw) => {
+      const workspace = workspaceSchema.parse(raw);
+      if (workspace.device_id !== device)
+        throw new BridgeError('DEVICE_MISMATCH', 'Device binding differs.');
+      return this.store.sessions(workspace).map((session) => ({
+        ...session,
+        connected: [...this.connections].some(
+          (other) => other.session?.session_id === session.session_id,
+        ),
+      }));
+    });
     handle('session.resume', async (raw) => {
       if (connection.session)
         throw new BridgeError('SESSION_BUSY', 'This connection is already bound.');

@@ -92,6 +92,23 @@ export const bindingSchema = workspaceSchema
   .strict();
 export type WorkspaceIdentity = z.infer<typeof workspaceSchema>;
 export type Binding = z.infer<typeof bindingSchema>;
+export const sessionSummarySchema = z
+  .object({
+    session_id: id,
+    worker_epoch: z.number().int().positive(),
+    latest_turn_state: z.enum([
+      'NEW',
+      'RUNNING',
+      'COMPLETED',
+      'FAILED',
+      'CANCELLED',
+      'INTERRUPTED',
+    ]),
+    unresolved_operations: z.number().int().nonnegative(),
+    connected: z.boolean(),
+  })
+  .strict();
+export type SessionSummary = z.infer<typeof sessionSummarySchema>;
 export const operationSchema = bindingSchema
   .extend({
     operation_id: id,

@@ -55,6 +55,7 @@ The project directory remains on the client. Prompts, requested file content and
 - Local UTF-8 read/search/edit/create tools with revision checks and diff approval.
 - Foreground commands with argv arrays, bounded output, timeout and process-group cancellation.
 - Durable operation receipts, duplicate suppression, explicit reconnect and event replay.
+- Session discovery scoped to the saved device/project/policy, with status metadata and explicit resume selection.
 - Crash outcomes marked `UNKNOWN` block further mutations until inspected.
 - Typed core modules, source-inclusive tarballs, architecture checks, automated tests and install smoke tests.
 

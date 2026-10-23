@@ -9,6 +9,7 @@ Usage: tether <command> [options]
 
   demo       Run a complete offline demo in a disposable workspace
   connect    Attach a local workspace to a relay
+  sessions   List sessions for the current device, workspace and policy
   server     Start a relay (requires an explicit runtime)
   device     Create or revoke a device credential while the relay is stopped
   doctor     Inspect Node, ripgrep and optional Claude installation (no model calls)
@@ -26,6 +27,15 @@ Development alpha. The offline demo does not require a Claude subscription.`,
   --allow-insecure-loopback  Allow ws://127.0.0.1 for an SSH tunnel or local demo
   --prompt <text>            Submit one turn, then exit; non-TTY mutations are denied
 Interactive commands: /quit and /help. Ctrl-C cancels the active turn.`,
+  sessions: `Usage: tether sessions --credential <device.json> --url <bridge-url> [options]
+  --workspace <path>          Local project (default: current directory)
+  --state <directory>         Same private client state used by connect (default: automatic)
+  --read-only                Select sessions created with the read-only policy
+  --ca <certificate>         Trust a private TLS certificate
+  --allow-insecure-loopback  Allow a numeric loopback URL for a local demo/SSH tunnel
+  --json                     Emit bounded session metadata as JSON
+Lists only the exact saved workspace binding. No session creation, model calls or local tools.
+Keep the original state directory; choose an ID explicitly with connect --resume <session-id>.`,
   server: `Usage: tether server --runtime fake [options]
   --state <database>   Default: $XDG_STATE_HOME/claude-tether/relay/relay.sqlite
   --host <address>     Default: 127.0.0.1; non-loopback requires TLS
@@ -78,6 +88,9 @@ export async function main(args: string[]): Promise<void> {
       }
       case 'connect':
         await (await import('../bridge-cli/main.js')).runClient(rest);
+        break;
+      case 'sessions':
+        await (await import('./sessions.js')).runSessions(rest);
         break;
       case 'server':
         await (await import('../relay-server/main.js')).runServer(rest);

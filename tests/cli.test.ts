@@ -4,6 +4,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import {
   mkdtempSync,
+  existsSync,
   mkdirSync,
   readFileSync,
   readdirSync,
@@ -15,6 +16,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { TestContext } from 'node:test';
+import { OperationJournal } from '../packages/operation-journal/index.js';
+import type { SessionSummary } from '../packages/protocol/index.js';
 
 const cli = fileURLToPath(new URL('../../bin/tether.mjs', import.meta.url));
 
@@ -41,6 +44,7 @@ void test('CLI help/version are side effect free and bad options do not echo sec
     ['--help'],
     ['--version'],
     ['connect', '--help'],
+    ['sessions', '--help'],
     ['server', '--help'],
     ['device', '--help'],
   ]) {
@@ -119,13 +123,45 @@ void test('separate CLI processes connect, resume, deny unattended mutations, an
     });
   });
   const args = ['connect', '--credential', credential, '--url', url, '--allow-insecure-loopback'];
+  const listArgs = ['sessions', ...args.slice(1)];
+  const initial = f.run(...listArgs, '--json');
+  assert.equal(initial.status, 0, initial.stderr);
+  assert.deepEqual(JSON.parse(initial.stdout), []);
+  const states = join(f.env.XDG_STATE_HOME, 'claude-tether', 'workspaces');
+  assert.equal(existsSync(states), false);
   const read = f.run(...args, '--prompt', 'read calc.mjs');
   assert.equal(read.status, 0, read.stderr);
   assert.match(read.stdout, /return a - b/);
   const session = /Session: ([a-z0-9-]+)/.exec(read.stdout)![1]!;
+  const state = join(states, readdirSync(states)[0]!);
+  const journal = new OperationJournal(join(state, 'operations.sqlite'));
+  try {
+    const cursor = journal.cursor(session);
+    const identity = readFileSync(join(state, 'workspace.json'), 'utf8');
+    const listed = f.run(...listArgs, '--json');
+    assert.equal(listed.status, 0, listed.stderr);
+    const sessions = JSON.parse(listed.stdout) as SessionSummary[];
+    assert.equal(sessions.length, 1);
+    assert.equal(sessions[0]!.session_id, session);
+    assert.equal(sessions[0]!.latest_turn_state, 'COMPLETED');
+    assert.equal(sessions[0]!.worker_epoch, 1);
+    assert.equal(journal.cursor(session), cursor);
+    assert.equal(readFileSync(join(state, 'workspace.json'), 'utf8'), identity);
+    assert.ok(!listed.stdout.includes('return a - b'));
+    const human = f.run(...listArgs);
+    assert.equal(human.status, 0, human.stderr);
+    assert.match(human.stdout, /SESSION ID/);
+    assert.match(human.stdout, /connect.*--resume/);
+    assert.equal(f.run(...listArgs, '--read-only', '--json').stdout.trim(), '[]');
+    assert.equal(readdirSync(states).length, 1);
+  } finally {
+    journal.close();
+  }
   const resume = f.run(...args, '--resume', session, '--prompt', 'read calc.mjs');
   assert.equal(resume.status, 0, resume.stderr);
   assert.match(resume.stdout, new RegExp('Session: ' + session));
+  const afterResume = JSON.parse(f.run(...listArgs, '--json').stdout) as SessionSummary[];
+  assert.equal(afterResume[0]!.worker_epoch, 2);
   const denied = f.run(...args, '--prompt', 'demo');
   assert.equal(denied.status, 1);
   assert.match(denied.stdout, /DENIED/);

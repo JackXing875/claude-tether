@@ -10,6 +10,7 @@
 - Align package metadata with the repository's existing GPL-3.0 license. Pin TypeScript 6.0.3 to match the supported typed ESLint parser.
 - Add a candidate official CLI supervisor with per-turn MCP capabilities, persistent explicit runtime session IDs, process-group teardown and synthetic subprocess integration tests. The public CLI remains fake-only pending official P0 verification.
 - Fix concurrent `BridgeClient.waitTurn` observers losing completion/disconnection results. Each observer now has an independent deadline; closing the client rejects all pending observers immediately. Validate deadlines and cap outstanding observers at 64 per client.
+- Add `tether sessions` and `BridgeClient.listSessions` for authenticated discovery scoped to the exact saved workspace. Queries return status metadata without creating sessions, running tools, advancing epochs or modifying the local journal. Share private workspace identity validation with `connect`.
 
 ### Compatibility
 
@@ -17,4 +18,5 @@
 - The server now requires `--runtime fake`; device administration uses `tether device create/revoke`. Direct execution of old compiled application files is replaced by `bin/tether.mjs` and npm script aliases.
 - Client `--config` remains an alias for `--credential`; explicit `--state` directories still work. Original source import locations retain compatibility re-exports.
 - No automatic migration or deletion of earlier state. The schema remains compatible with the initial operation/event tables; use a stopped, backed-up state directory when upgrading.
+- Session discovery adds an optional `session.list` RPC without a database migration. Upgrade both ends to use it; older relays reject the unsupported method explicitly.
 - Official Claude runtime compatibility, subscription end-to-end verification, native Windows, automatic reconnect and full TUI remain pending. No stable release is claimed.

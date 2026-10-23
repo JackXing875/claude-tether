@@ -47,6 +47,8 @@ Compatibility re-exports under the original `apps` locations preserve checkout i
 
 `BridgeClient.waitTurn(turnId, timeoutMs)` observes a terminal event; it does not submit or cancel a turn. Multiple callers can observe the same turn with independent deadlines. Timeout reports `TURN_TIMEOUT` without establishing the remote outcome; callers can wait again or explicitly resume after disconnect. Deadlines must be integer milliseconds in the range 1–2147483647 (default 120000); up to 64 pending observers are allowed per client. `close()` immediately rejects all pending observers with `WORKSPACE_OFFLINE` and is safe to repeat. The application still owns and must close its `LocalHost`. Already retained terminal events remain readable after closing the connection.
 
+`BridgeClient.listSessions(options)` opens a short authenticated connection without a `LocalHost` or any tool handler. The additive `session.list` RPC filters the authenticated device and every workspace identity field, returning at most 128 metadata records in reverse creation order. It reads existing session/turn/dispatch tables; it neither claims ownership nor increments the worker epoch. The CLI reads the same private, validated `workspace.json` as `connect`, without opening the operation journal or creating missing state. Actual resume retains all original ownership, binding and reconciliation checks.
+
 ## A tool call
 
 1. The relay binds a turn to device, workspace generation, execution target, policy revision and worker epoch.

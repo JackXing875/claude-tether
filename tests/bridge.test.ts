@@ -11,7 +11,7 @@ import { BridgeClient } from '../packages/client/index.js';
 import type { AgentRuntime } from '../packages/runtime-adapter/types.js';
 import { fixture } from './helpers.js';
 import type { TestContext } from 'node:test';
-import type { RelayEvent } from '../packages/protocol/index.js';
+import type { RelayEvent, WorkspaceIdentity } from '../packages/protocol/index.js';
 
 async function network(
   t: TestContext,
@@ -316,4 +316,103 @@ void test('turn waits reject invalid deadlines and bound observers without leaki
   pending.push(assert.rejects(client.waitTurn(turnId, 1000), { code: 'WORKSPACE_OFFLINE' }));
   client.close();
   await Promise.all(pending);
+});
+
+void test('session discovery is authenticated, exact-workspace scoped and does not attach or run work', async (t) => {
+  let runs = 0;
+  const f = await network(t, {
+    kind: 'fake',
+    async run() {
+      runs++;
+    },
+  });
+  const options = {
+    url: f.url,
+    token: f.device.token,
+    workspace: f.workspace,
+    allowInsecureLoopback: true,
+  };
+  assert.deepEqual(await BridgeClient.listSessions(options), []);
+  assert.deepEqual(f.server.store.sessions(f.workspace), []);
+  const client = await f.connect();
+  const expected = {
+    session_id: client.binding!.session_id,
+    worker_epoch: 1,
+    latest_turn_state: 'NEW',
+    unresolved_operations: 0,
+    connected: true,
+  };
+  const variants: WorkspaceIdentity[] = [
+    { ...f.workspace, workspace_id: randomUUID() },
+    { ...f.workspace, workspace_generation: 2 },
+    { ...f.workspace, execution_target_id: randomUUID() },
+    { ...f.workspace, policy_revision: 2 },
+  ];
+  for (const workspace of variants) f.server.store.create(workspace);
+  const other = f.server.store.provision('other-device');
+  f.server.store.create({ ...f.workspace, device_id: other.device_id });
+  assert.deepEqual(await BridgeClient.listSessions(options), [expected]);
+  assert.deepEqual(await BridgeClient.listSessions(options), [expected]);
+  assert.equal(f.server.store.sessions(f.workspace).length, 1);
+  assert.equal(f.server.store.session(expected.session_id, f.device.device_id).worker_epoch, 1);
+  assert.equal(runs, 0);
+  assert.deepEqual(f.host.journal.counts(), []);
+  await assert.rejects(BridgeClient.listSessions({ ...options, token: 'bad-token' }));
+  await assert.rejects(
+    BridgeClient.listSessions({
+      ...options,
+      workspace: { ...f.workspace, device_id: other.device_id },
+    }),
+    { code: 'DEVICE_MISMATCH' },
+  );
+  await assert.rejects(
+    client.peer.request('session.list', { ...f.workspace, device_id: other.device_id }),
+    { code: 'DEVICE_MISMATCH' },
+  );
+  assert.deepEqual(
+    await BridgeClient.listSessions({
+      ...options,
+      workspace: { ...f.workspace, workspace_id: 'unknown-project' },
+    }),
+    [],
+  );
+});
+
+void test('session discovery reports pending effects and turn state without replaying, resolving or leaking content', async (t) => {
+  const f = await network(t);
+  const binding = f.server.store.create(f.workspace);
+  const turn = f.server.store.turn(binding.session_id, randomUUID(), 'private-prompt');
+  f.server.store.finishTurn(turn.turn_id, 'INTERRUPTED');
+  const operation = f.operation(
+    'run_command',
+    { program: 'private-program', args: [] },
+    {
+      ...binding,
+      turn_id: turn.turn_id,
+    },
+  );
+  f.server.store.dispatch(operation);
+  f.server.store.result({ operation_id: operation.operation_id, status: 'UNKNOWN' });
+  const list = await BridgeClient.listSessions({
+    url: f.url,
+    token: f.device.token,
+    workspace: f.workspace,
+    allowInsecureLoopback: true,
+  });
+  assert.deepEqual(list, [
+    {
+      session_id: binding.session_id,
+      worker_epoch: 1,
+      latest_turn_state: 'INTERRUPTED',
+      unresolved_operations: 1,
+      connected: false,
+    },
+  ]);
+  assert.equal(f.server.store.pending(binding.session_id).length, 1);
+  assert.equal(f.server.store.events(binding.session_id, 0).length, 0);
+  assert.equal(f.host.journal.get(operation.operation_id), undefined);
+  assert.ok(!JSON.stringify(list).includes('private-'));
+  await assert.rejects(f.connect({ resumeSession: binding.session_id }), {
+    code: 'RECONCILIATION_REQUIRED',
+  });
 });

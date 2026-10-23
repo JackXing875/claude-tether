@@ -58,13 +58,19 @@ tether connect \
 
 Enter `demo`; approve the edit and the test command separately with `y`. `read calc.mjs` reads the file; `/quit` exits. Ctrl-C cancels an active turn. Clean up the disposable directory after inspection. Do not use `demo` as an arbitrary coding prompt: the fake agent only knows this scripted task and `read <relative-path>`.
 
-Client state is chosen automatically from the relay URL, device, canonical project path and policy, and stored outside the project. Keep those values unchanged to resume a printed session ID:
+Client state is chosen automatically from the relay URL, device, canonical project path and policy, and stored outside the project. Keep those values unchanged to list matching sessions and explicitly choose an ID to resume:
 
 ```bash
+tether sessions --credential "$HOME/.local/state/claude-tether/device.json" \
+  --url ws://127.0.0.1:8787/v1/bridge --allow-insecure-loopback \
+  --workspace "$TETHER_DEMO_PROJECT"
+
 tether connect --credential "$HOME/.local/state/claude-tether/device.json" \
   --url ws://127.0.0.1:8787/v1/bridge --allow-insecure-loopback \
   --workspace "$TETHER_DEMO_PROJECT" --resume SESSION_ID
 ```
+
+The list shows the latest turn state, whether a client is attached, and unresolved operation counts. Add `--json` for metadata only; prompt text, tool arguments and results are excluded. It uses the saved local workspace identity and does not create a session, start a model, execute tools or modify the local journal. If you used `--state` or `--read-only` with `connect`, use those options here too. An unused workspace returns an empty list without creating state. Keep the original state directory; discovery cannot reconstruct a lost workspace identity. Status is a snapshot, and resume still checks ownership and reconciles operations.
 
 For a single unattended read, append `--prompt 'read calc.mjs'`. Without an interactive terminal, all mutations are denied. `--read-only` also denies all commands, including commands described as reads. An UNKNOWN operation requires inspection; restarting or inventing a new operation ID is not a recovery procedure.
 
@@ -92,6 +98,7 @@ Use the same loopback URL as step 3. The relay requires no public listening port
 | `TLS_REQUIRED`                                 | Use WSS, or explicitly enable a numeric loopback URL for a tunnel/demo                           |
 | `WORKSPACE_MISMATCH`                           | Restore the original project/device/state; do not reuse identity files for a different directory |
 | `OUTCOME_UNKNOWN`                              | Inspect local effects and journal evidence before further writes; see the runbook                |
+| `METHOD_NOT_FOUND` from `sessions`             | Upgrade the relay and client together; early prototypes do not implement session discovery       |
 | Claude is absent in `doctor`                   | Expected on a client and allowed for the offline demo                                            |
 
 `tether doctor --json` produces an allowlisted diagnostic summary. It never calls the model and does not establish subscription compatibility. Never attach raw state databases or credentials to issues.

@@ -5,6 +5,7 @@ The project is a development alpha. “Open-source engineering foundation” and
 ## Foundation
 
 - Unified CLI, explicit runtime selection, private state defaults and device commands.
+- Authenticated session discovery for the exact saved workspace, with status metadata and explicit resume selection.
 - Core modules with an enforced dependency graph and public typed exports.
 - Reproducible source build, source-inclusive tarball, clean production-install smoke test.
 - Linux/Node 24 CI, type/lint/format/docs checks, recovery and permission tests, coverage artifacts.
@@ -27,7 +28,7 @@ Do not enable `--runtime claude`, publish a stable release or describe the syste
 ## Daily-use beta
 
 - Reliable worker supervision and restart with a recovery UI for unknown operations.
-- Session listing and selection, reconnect UX, local project context and clear permission presentation.
+- Build on session listing and explicit ID selection with reconnect UX, local project context and clear permission presentation.
 - Foreground task UX, file-edit review/undo, resource soak tests and upgrade/migration procedures.
 - Cross-platform support only after native tests: Windows requires process/job, path and file-identity work; macOS requires its own execution/cancellation coverage.
 - Hooks/skills, local MCP extensions, IDE integration, PTY and background work only with explicit trust and lifecycle contracts.

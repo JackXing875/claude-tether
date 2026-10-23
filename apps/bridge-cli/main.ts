@@ -3,16 +3,16 @@ import { parseArgs } from 'node:util';
 import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { z } from 'zod';
 import { terminalText } from '../../packages/diagnostics/index.js';
 import { LocalHost } from '../../packages/local-host/index.js';
 import { BridgeClient } from '../../packages/client/index.js';
-import { BridgeError, failure, workspaceSchema } from '../../packages/protocol/index.js';
+import { BridgeError, failure } from '../../packages/protocol/index.js';
 import {
   assertOutsideWorkspace,
   clientState,
   ensurePrivateDirectory,
   readCredential,
+  readWorkspaceIdentity,
 } from '../../packages/config/index.js';
 
 export async function runClient(args: string[]): Promise<void> {
@@ -77,52 +77,32 @@ export async function runClient(args: string[]): Promise<void> {
       },
     });
     const identityPath = join(state, 'workspace.json');
-    const persistedSchema = z
-      .object({
-        root: z.string(),
-        directory_identity: z.string(),
-        policy: z.enum(['ask', 'read-only']),
-        binding: workspaceSchema,
-      })
-      .strict();
-    let identity: z.infer<typeof persistedSchema>;
-    try {
-      identity = persistedSchema.parse(JSON.parse(readFileSync(identityPath, 'utf8')));
-      if (
-        identity.root !== root ||
-        identity.directory_identity !== host.tools.identity() ||
-        identity.binding.device_id !== credentials.device_id
-      ) {
-        throw new BridgeError(
-          'WORKSPACE_MISMATCH',
-          'Workspace or device changed. Use a new state directory and session.',
-        );
-      }
-      if (identity.policy !== policy)
-        throw new BridgeError(
-          'POLICY_CHANGED',
-          'Policy changed. Use a new state directory and session.',
-        );
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-      identity = {
+    let binding = readWorkspaceIdentity(identityPath, {
+      root,
+      directory_identity: host.tools.identity(),
+      policy,
+      device_id: credentials.device_id,
+    });
+    if (!binding) {
+      binding = {
+        device_id: credentials.device_id,
+        workspace_id: randomUUID(),
+        workspace_generation: 1,
+        execution_target_id: randomUUID(),
+        policy_revision: 1,
+      };
+      const identity = {
         root,
         directory_identity: host.tools.identity(),
         policy,
-        binding: {
-          device_id: credentials.device_id,
-          workspace_id: randomUUID(),
-          workspace_generation: 1,
-          execution_target_id: randomUUID(),
-          policy_revision: 1,
-        },
+        binding,
       };
       writeFileSync(identityPath, JSON.stringify(identity), { mode: 0o600, flag: 'wx' });
     }
     client = await BridgeClient.connect({
       url: values.url,
       token: credentials.token,
-      workspace: identity.binding,
+      workspace: binding,
       host,
       allowInsecureLoopback: values['allow-insecure-loopback'],
       ca: values.ca ? readFileSync(values.ca) : undefined,

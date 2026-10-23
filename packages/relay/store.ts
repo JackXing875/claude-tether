@@ -1,11 +1,12 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { StateDatabase } from '../storage/index.js';
-import { bindingSchema, BridgeError, digest, id } from '../protocol/index.js';
+import { bindingSchema, BridgeError, digest, id, workspaceSchema } from '../protocol/index.js';
 import type {
   Binding,
   Operation,
   OperationResult,
   RelayEvent,
+  SessionSummary,
   WorkspaceIdentity,
 } from '../protocol/index.js';
 
@@ -69,6 +70,35 @@ export class RelayStore {
     if (!row)
       throw new BridgeError('SESSION_NOT_FOUND', 'Session is not available to this device.');
     return bindingSchema.parse(JSON.parse(String(row.binding)));
+  }
+  sessions(workspace: WorkspaceIdentity): Omit<SessionSummary, 'connected'>[] {
+    return this.storage.db
+      .prepare(
+        [
+          'SELECT s.binding,',
+          "COALESCE((SELECT state FROM turns WHERE session_id=s.id ORDER BY rowid DESC LIMIT 1), 'NEW') AS latest_turn_state,",
+          "(SELECT count(*) FROM dispatches WHERE session_id=s.id AND (result IS NULL OR json_extract(result, '$.status')='UNKNOWN')) AS unresolved_operations",
+          'FROM sessions s WHERE s.device_id=? ORDER BY s.rowid DESC LIMIT 128',
+        ].join(' '),
+      )
+      .all(workspace.device_id)
+      .flatMap((row) => {
+        const binding = bindingSchema.parse(JSON.parse(String(row.binding)));
+        if (
+          (Object.keys(workspaceSchema.shape) as (keyof WorkspaceIdentity)[]).some(
+            (key) => binding[key] !== workspace[key],
+          )
+        )
+          return [];
+        return [
+          {
+            session_id: binding.session_id,
+            worker_epoch: binding.worker_epoch,
+            latest_turn_state: row.latest_turn_state as SessionSummary['latest_turn_state'],
+            unresolved_operations: Number(row.unresolved_operations),
+          },
+        ];
+      });
   }
   bump(binding: Binding): Binding {
     const next = { ...binding, worker_epoch: binding.worker_epoch + 1 };

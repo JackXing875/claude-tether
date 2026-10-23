@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -39,6 +39,7 @@ try {
   for (const required of [
     'bin/tether.mjs',
     'dist/apps/cli/index.js',
+    'dist/apps/cli/sessions.js',
     'dist/packages/client/index.d.ts',
     'dist/apps/mcp-bridge/worker.js',
     'dist/packages/runtime-adapter/supervisor.js',
@@ -69,6 +70,32 @@ try {
   assert.equal(run(executable, ['--version'], { cwd: temporary }).trim(), pkg.version);
   assert.match(run(executable, ['--help'], { cwd: temporary }), /Usage: tether/);
   assert.match(run(executable, ['demo'], { cwd: temporary }), /演示验收通过/);
+  const credential = join(temporary, 'demo-device.json');
+  const state = join(temporary, 'unused-client-state');
+  writeFileSync(credential, JSON.stringify({ device_id: 'package-test', token: 'x'.repeat(43) }), {
+    mode: 0o600,
+  });
+  assert.deepEqual(
+    JSON.parse(
+      run(
+        executable,
+        [
+          'sessions',
+          '--credential',
+          credential,
+          '--state',
+          state,
+          '--url',
+          'ws://127.0.0.1:9/v1/bridge',
+          '--allow-insecure-loopback',
+          '--json',
+        ],
+        { cwd: temporary },
+      ),
+    ),
+    [],
+  );
+  assert.equal(existsSync(state), false);
   const installed = join(prefix, 'lib', 'node_modules', pkg.name);
   // Import public exports from a consumer, not through unpublished source paths.
   run(
@@ -81,7 +108,7 @@ try {
     { cwd: installed },
   );
   console.log(
-    'Package smoke passed: clean production install, public exports, help, version, and full offline demo.',
+    'Package smoke passed: clean production install, public exports, help, version, session discovery, and full offline demo.',
   );
   console.log('Artifact: ' + packed.filename + ' (' + packed.files.length + ' files)');
 } finally {

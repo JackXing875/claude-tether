@@ -18,6 +18,8 @@ P1 网络配置：
 
 断线后，不要重新发送整项任务。使用原客户端状态目录及 --resume 原 session ID。服务端首先查询本地操作结果；未知或缺失结果会阻止恢复。收到 FILE_CHANGED 后重新读取文件和预览；收到 UNKNOWN/RECONCILIATION_REQUIRED 时先人工核查操作效果。
 
+忘记 session ID 时，用 `tether sessions` 并传入原 `--credential`、`--url`、`--workspace`，以及曾使用的 `--state` / `--read-only` 选项。列表只包含设备和完整项目身份匹配的会话，显示最近一轮状态、当前连接状态和待核实操作数；`--json` 只输出这些元数据。查询不会创建会话、推进 epoch、打开操作账本或解除 UNKNOWN 阻断，可以在客户端仍运行时查看。状态只是查询时的快照，选择 ID 后仍须显式 `connect --resume` 并通过对账。首次使用或缺少原身份文件时返回空列表，不自动重建身份；旧版 relay 不支持该 RPC，需要与客户端一起升级。
+
 目前没有提供“一键清空 UNKNOWN”接口。不要删 journal 或换 operation_id 来绕过未知结果。如果确需归档，先停止两个组件，审阅已有文件/命令效果并保留数据库及 WAL 的一致备份，再明确建立新会话。
 
 STATE_IN_USE 表示同一状态库已有活进程持有 SQLite lease。正常退出或进程崩溃后锁会释放；不要删除 lease 文件强行并行启动。

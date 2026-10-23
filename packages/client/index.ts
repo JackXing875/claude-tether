@@ -8,23 +8,84 @@ import {
   id,
   PROTOCOL_VERSION,
   resultSchema,
+  sessionSummarySchema,
 } from '../protocol/index.js';
-import type { Binding, RelayEvent, WorkspaceIdentity } from '../protocol/index.js';
+import type { Binding, RelayEvent, SessionSummary, WorkspaceIdentity } from '../protocol/index.js';
 import { RpcPeer } from '../transport/index.js';
 import { LocalHost } from '../local-host/index.js';
 import { z } from 'zod';
 
-export interface ClientOptions {
+export interface SessionListOptions {
   url: string;
   token: string;
   workspace: WorkspaceIdentity;
-  host: LocalHost;
   allowInsecureLoopback?: boolean;
   ca?: string | Buffer;
+}
+export interface ClientOptions extends SessionListOptions {
+  host: LocalHost;
   resumeSession?: string;
   onEvent?: (event: RelayEvent) => void;
 }
 const receiptSchema = z.object({ turn_id: id, state: z.string(), created: z.boolean() }).strict();
+const helloResponseSchema = z
+  .object({
+    protocol_version: z.literal(PROTOCOL_VERSION),
+    runtime: z.enum(['fake', 'claude']),
+    max_message_bytes: z
+      .number()
+      .int()
+      .positive()
+      .max(1024 * 1024),
+  })
+  .strict();
+
+async function openSocket(options: SessionListOptions): Promise<WebSocket> {
+  const url = new URL(options.url);
+  if (url.username || url.password || url.search || url.hash || url.pathname !== '/v1/bridge') {
+    throw new BridgeError(
+      'INVALID_URL',
+      'Use a bridge URL without embedded credentials or query parameters.',
+    );
+  }
+  if (
+    url.protocol !== 'wss:' &&
+    !(
+      url.protocol === 'ws:' &&
+      options.allowInsecureLoopback &&
+      ['127.0.0.1', '[::1]'].includes(url.hostname)
+    )
+  ) {
+    throw new BridgeError(
+      'TLS_REQUIRED',
+      'Use WSS, or explicitly enable a numeric loopback URL for a local demo/SSH tunnel.',
+    );
+  }
+  const socket = new WebSocket(url, {
+    headers: { Authorization: 'Bearer ' + options.token },
+    maxPayload: 1024 * 1024,
+    perMessageDeflate: false,
+    handshakeTimeout: 8000,
+    ca: options.ca,
+  });
+  await new Promise<void>((resolve, reject) => {
+    socket.once('open', () => {
+      socket.off('error', reject);
+      resolve();
+    });
+    socket.once('error', reject);
+  });
+  return socket;
+}
+
+async function hello(peer: RpcPeer, deviceId: string) {
+  return helloResponseSchema.parse(
+    await peer.request('connection.hello', {
+      protocol_version: PROTOCOL_VERSION,
+      device_id: deviceId,
+    }),
+  );
+}
 interface TurnWaiter {
   resolve: (event: RelayEvent) => void;
   reject: (error: unknown) => void;
@@ -87,60 +148,10 @@ export class BridgeClient {
     this.waiters.clear();
   }
   static async connect(options: ClientOptions): Promise<BridgeClient> {
-    const url = new URL(options.url);
-    if (url.username || url.password || url.search || url.hash || url.pathname !== '/v1/bridge') {
-      throw new BridgeError(
-        'INVALID_URL',
-        'Use a bridge URL without embedded credentials or query parameters.',
-      );
-    }
-    if (
-      url.protocol !== 'wss:' &&
-      !(
-        url.protocol === 'ws:' &&
-        options.allowInsecureLoopback &&
-        ['127.0.0.1', '[::1]'].includes(url.hostname)
-      )
-    ) {
-      throw new BridgeError(
-        'TLS_REQUIRED',
-        'Use WSS, or explicitly enable a numeric loopback URL for a local demo/SSH tunnel.',
-      );
-    }
-    const socket = new WebSocket(url, {
-      headers: { Authorization: 'Bearer ' + options.token },
-      maxPayload: 1024 * 1024,
-      perMessageDeflate: false,
-      handshakeTimeout: 8000,
-      ca: options.ca,
-    });
-    await new Promise<void>((resolve, reject) => {
-      socket.once('open', () => {
-        socket.off('error', reject);
-        resolve();
-      });
-      socket.once('error', reject);
-    });
+    const socket = await openSocket(options);
     const client = new BridgeClient(options, socket);
     try {
-      const hello = z
-        .object({
-          protocol_version: z.literal(PROTOCOL_VERSION),
-          runtime: z.enum(['fake', 'claude']),
-          max_message_bytes: z
-            .number()
-            .int()
-            .positive()
-            .max(1024 * 1024),
-        })
-        .strict()
-        .parse(
-          await client.peer.request('connection.hello', {
-            protocol_version: PROTOCOL_VERSION,
-            device_id: options.workspace.device_id,
-          }),
-        );
-      client.runtime = hello.runtime;
+      client.runtime = (await hello(client.peer, options.workspace.device_id)).runtime;
       const binding = bindingSchema.parse(
         await client.peer.request(
           options.resumeSession ? 'session.resume' : 'session.create',
@@ -161,6 +172,21 @@ export class BridgeClient {
     } catch (error) {
       client.close();
       throw error;
+    }
+  }
+  /** Query this exact workspace without binding a host, creating a session or running tools. */
+  static async listSessions(options: SessionListOptions): Promise<SessionSummary[]> {
+    const socket = await openSocket(options);
+    const peer = new RpcPeer(socket);
+    try {
+      await hello(peer, options.workspace.device_id);
+      return z
+        .array(sessionSummarySchema)
+        .max(128)
+        .parse(await peer.request('session.list', options.workspace));
+    } finally {
+      peer.close();
+      socket.terminate();
     }
   }
   private receive(event: RelayEvent): void {
