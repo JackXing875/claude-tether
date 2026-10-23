@@ -17,3 +17,5 @@ credentials*.json
 client.local.json
 server.local.json
 .DS_Store
+artifacts/
+*.tgz

@@ -1,37 +1,104 @@
-# 原型运行与恢复
+# Operations guide
 
-## 安装与运行
+## First-time SSH access
 
-先按 README 执行 npm ci、npm test、npm run demo。服务和客户端当前仅支持 Linux/WSL。Node 版本由 .nvmrc 固定，ripgrep 必须存在于本地 PATH。
+If you already use an SSH key or ssh-agent to connect to your VPS, reuse that access. Confirm the server's host fingerprint with your hosting provider and make an initial interactive connection before running Tether:
 
-服务端设备注册会将 secret 写入指定的 0600 文件；不要将该文件放入项目或命令参数。启动 CLI 需要服务 URL、设备文件、工作区和专属私有状态目录。工作区或策略发生变化时，使用新的绑定；不要复用另一个设备的状态目录。
+```bash
+ssh user@your-vps
+```
 
-P1 网络配置：
+An SSH alias is optional. For a non-default port or key, a standard SSH config entry keeps the launcher command short:
 
-- 回环开发/SSH 隧道：服务只绑定 127.0.0.1，客户端显式 --allow-insecure-loopback。
-- WSS：服务端传 --cert/--key。客户端验证系统 CA；私有 CA 可通过 --ca 显式信任，不提供关闭证书校验选项。
-- 不配置公网无鉴权入口，不在 URL 中传 token。
+```sshconfig
+Host my-vps
+    HostName your-vps.example
+    User your-user
+    Port 22
+    IdentityFile ~/.ssh/your_key
+    IdentitiesOnly yes
+```
 
-## 停止和恢复
+Password-only SSH is not supported for automatic reconnects. Configure a key using your hosting provider's instructions or load your existing passphrase-protected key into ssh-agent. Tether uses `BatchMode=yes` and `StrictHostKeyChecking=yes`; it does not collect passwords or automatically accept unknown host keys.
 
-客户端 Ctrl+C 在当前 turn 中请求取消本地进程和远端任务；/quit 退出。服务端 SIGTERM/SIGINT 会停止接收、终止模拟 turn 并关闭状态库。命令终止不意味着已执行的副作用回滚。
+The VPS must allow TCP forwarding. If a connection reports `administratively prohibited`, check sshd's `AllowTcpForwarding`, `DisableForwarding`, `PermitOpen`, and authorized_keys restrictions. Keep an existing administrative session open while validating and reloading any server configuration changes.
 
-断线后，不要重新发送整项任务。使用原客户端状态目录及 --resume 原 session ID。服务端首先查询本地操作结果；未知或缺失结果会阻止恢复。收到 FILE_CHANGED 后重新读取文件和预览；收到 UNKNOWN/RECONCILIATION_REQUIRED 时先人工核查操作效果。
+No additional public port, TLS certificate, VPS Node runtime, Claude installation, or project checkout is required.
 
-目前没有提供“一键清空 UNKNOWN”接口。不要删 journal 或换 operation_id 来绕过未知结果。如果确需归档，先停止两个组件，审阅已有文件/命令效果并保留数据库及 WAL 的一致备份，再明确建立新会话。
+## Setup and everyday use
 
-STATE_IN_USE 表示同一状态库已有活进程持有 SQLite lease。正常退出或进程崩溃后锁会释放；不要删除 lease 文件强行并行启动。
+```bash
+claude-tether setup my-vps
+cd your-project
+claude-tether
+```
 
-## VPS 已准备内容
+Setup checks the local Claude executable and the SSH/SOCKS listener. It saves preferences only after those checks pass, using an atomic replacement and a private file mode. It does not make a model request or prove that the VPS can reach every upstream destination. Existing working preferences survive a failed setup.
 
-deploy/bootstrap-vps.sh 仅准备 P0 依赖：独立 claude-relay 账号、/var/lib/claude-relay、官方 Claude Code 2.1.267，以及 /opt/personal-relay/runtime 下固定版本 Node。Node 归档校验 SHA-256，Claude 走官方安装器。脚本不配置防火墙、不注册 systemd、不开放公网端口。
+To change the default, run setup again. To override it temporarily, use `--ssh`, `--ssh-config`, or `--claude` on a normal launch. A temporary override does not modify saved preferences.
 
-原型程序副本位于 /opt/personal-relay/prototype，包含编译产物和生产依赖；源代码与构建保留在本地。VPS 直接使用 node 运行 dist 入口；需要更新时先在本地构建、验证，再复制产物。真实订阅稍后按 AUTH.md 登录。日常服务部署、TLS 域名、systemd 启动及资源测量仍待 P0 之后开展。
+```bash
+claude-tether setup my-vps --ssh-config ~/.ssh/tether-config
+claude-tether --ssh another-vps
+claude-tether doctor
+```
 
-维护时保留 DISABLE_AUTOUPDATER=1；新版本先通过契约测试与真实 P0，再更新固定版本。当前网页文档可能描述比 2.1.267 更新的功能，本项目以实际安装版本帮助信息和测试为准。
+Preferences live at `$XDG_CONFIG_HOME/claude-tether/config.json`, falling back to `~/.config/claude-tether/config.json`. Saved file paths are absolute, so launching from another project does not change their meaning. Delete that file to remove Tether's preferences; Claude and SSH credentials are stored elsewhere and are unaffected.
 
-## 诊断
+Run Tether from the project you want Claude to work on. `npm --prefix ...` changes the working directory and should not be used as a substitute for the installed launcher.
 
-npm run doctor 输出脱敏的本地版本/认证方式，不发起模型请求。设备、操作和事件状态是私有数据；即使普通日志不存正文，SQLite 的结果和事件、官方 transcript 仍可能包含代码。
+## Official Claude login and sessions
 
-测试用的临时账号凭据和进程需要在联调后清理。保留安装好的专用运行环境，便于后续官方登录。不要停止 VPS 上不属于本项目的其他服务。
+```bash
+claude-tether -- auth login
+claude-tether -- auth status
+claude-tether -- --continue
+claude-tether -- --resume SESSION_ID
+```
+
+The official local CLI manages authentication and refresh. Tether does not export credentials or clear existing API key/provider settings. Confirm your account and authentication method in Claude itself.
+
+A browser opened for authorization does not inherit the CLI's proxy environment. If the authorization page cannot load, use the browser's supported network configuration. Do not paste authorization codes or tokens into issue reports or Tether settings.
+
+An earlier VPS-based prototype may have left software on the server. That installation is not used by this version; removal is a separate administrative action. Local Claude authentication is independent of any login saved on the VPS.
+
+## Connection recovery
+
+SSH sends keepalives every 15 seconds and exits after three unanswered probes. Tether reconnects with jittered exponential backoff, starting around 0.5 seconds and capped at 30 seconds. A connection that stays ready for 30 seconds resets the backoff.
+
+The local proxy and Claude process remain in place during reconnection. A new CONNECT has a 30-second establishment deadline. An established stream has no Tether idle deadline; a pause in model output does not trigger an application timeout.
+
+Existing connections close when their SSH transport is lost. Tether does not resend model requests, tool calls, or complete tasks. Follow Claude's error/retry behavior and inspect any local changes before explicitly repeating an operation.
+
+Normal terminal Ctrl+C remains available to Claude. Exiting Claude closes Tether's proxy and SSH child. Use SIGTERM when stopping the complete launcher as a background process.
+
+## Network scope
+
+Tether sets upper- and lower-case HTTP/HTTPS proxy variables only in Claude's process environment. Claude's child tools inherit them. `NO_PROXY` is limited to localhost, 127.0.0.1 and ::1; an inherited `NO_PROXY=*` cannot silently bypass the tunnel.
+
+The proxy accepts HTTPS CONNECT only. Ordinary HTTP receives `405`; UDP, browsers and tools that ignore proxy variables are not routed. This is not a system-wide VPN. Destination DNS for tunneled connections is resolved through the VPS. TLS stays between the local client and its destination.
+
+## Troubleshooting
+
+| Symptom | Action |
+| --- | --- |
+| Local Claude is unavailable | Install the official CLI, check `claude --version`, or specify `--claude` |
+| Unknown host or permission denied | Verify the same destination with ordinary SSH, including the same `-F` configuration when used |
+| Setup never becomes ready | Check keys/ssh-agent, known_hosts, the SSH port and network reachability; startup stops after 30 seconds |
+| SSH disconnected | Allow the reconnect loop to recover; the local Claude process stays alive |
+| Proxy `502` | A tunnel or destination connection could not be established; inspect SSH and VPS outbound access |
+| Proxy `405` | The application attempted ordinary HTTP, which this beta does not support |
+| Model output is interrupted | Use Claude's own retry/session recovery; Tether cannot resume a broken TCP stream |
+| Invalid settings | Inspect the named local preferences file; it accepts only `ssh`, `sshConfig` and `claude` strings |
+
+Tether logs connection state and OpenSSH's diagnostics. It does not log model request bodies or credentials. Redact hostnames, usernames and local paths before sharing diagnostic output.
+
+## Upgrade and uninstall
+
+Install the tarball from a newer GitHub prerelease using the same global npm command shown in its release notes. Saved preferences remain outside the package.
+
+```bash
+npm uninstall --global claude-tether
+```
+
+Uninstalling removes the launcher. Remove the preferences file separately if desired; do not delete Claude or SSH state to troubleshoot Tether.

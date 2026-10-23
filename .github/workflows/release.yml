@@ -1,0 +1,43 @@
+name: Publish beta
+on:
+  push:
+    tags:
+      - 'v*-beta.*'
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: sudo apt-get update && sudo apt-get install -y openssh-client openssh-server openssl
+      - run: sudo mkdir -p /run/sshd
+      - name: Verify version and release notes
+        run: |
+          node --input-type=module -e 'import { readFileSync, accessSync } from "node:fs"; const { version } = JSON.parse(readFileSync("package.json")); if (!/^\d+\.\d+\.\d+-beta\.\d+$/.test(version) || process.env.GITHUB_REF_NAME !== "v" + version) throw new Error("Tag/version mismatch"); accessSync("docs/releases/" + process.env.GITHUB_REF_NAME + ".md");'
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:package
+      - run: npm audit --omit=dev
+      - name: Build release assets
+        run: |
+          mkdir -p artifacts
+          npm pack --ignore-scripts --pack-destination artifacts
+          cd artifacts
+          sha256sum ./*.tgz > SHA256SUMS
+      - name: Publish GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" artifacts/*.tgz artifacts/SHA256SUMS \
+            --verify-tag --prerelease --title "Claude Tether $GITHUB_REF_NAME" \
+            --notes-file "docs/releases/$GITHUB_REF_NAME.md"

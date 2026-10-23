@@ -1,0 +1,125 @@
+#!/usr/bin/env node
+import { spawn, spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { constants } from 'node:os';
+import { resolve } from 'node:path';
+import { createInterface } from 'node:readline/promises';
+import { parseArgs } from 'node:util';
+import { startProxy } from './proxy.js';
+import { SshTunnel } from './tunnel.js';
+import { readSettings, saveSettings, settingsPath } from './settings.js';
+
+export function proxyEnvironment(source: NodeJS.ProcessEnv, url: string): NodeJS.ProcessEnv {
+  const env = { ...source };
+  for (const key of ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy']) env[key] = url;
+  for (const key of ['NO_PROXY', 'no_proxy']) env[key] = 'localhost,127.0.0.1,::1';
+  delete env.ALL_PROXY;
+  delete env.all_proxy;
+  return env;
+}
+
+export async function main(argv: string[]): Promise<number> {
+  const separator = argv.indexOf('--');
+  const ownArgs = argv.slice(0, separator < 0 ? argv.length : separator);
+  const command = ['setup', 'doctor'].includes(ownArgs[0] ?? '') ? ownArgs.shift()! : 'run';
+  const { values, positionals } = parseArgs({ args: ownArgs, allowPositionals: command === 'setup', options: {
+    ssh: { type: 'string' }, 'ssh-config': { type: 'string' },
+    claude: { type: 'string' }, help: { type: 'boolean', short: 'h' }, version: { type: 'boolean', short: 'v' },
+  } });
+  if (values.help) {
+    console.log(`Usage: claude-tether [options] -- [Claude arguments]
+       claude-tether setup [SSH alias|user@host] [options]
+       claude-tether doctor [options]
+
+Runs official Claude Code locally through an automatically reconnected SSH tunnel.
+
+First use:  claude-tether setup my-vps
+Daily use:  claude-tether
+Resume:     claude-tether -- --continue
+
+Options:
+  --ssh <destination>   Override the saved SSH destination for this invocation
+  --ssh-config <file>  Use a specific OpenSSH configuration file
+  --claude <path>      Use a specific official Claude executable
+  -h, --help          Show this help
+  -v, --version       Show the installed version
+
+Setup checks local Claude and SSH before saving preferences; no credentials are saved.
+Doctor checks the executable and SSH tunnel without sending a model request.
+First verify the host key and key/agent login with ssh. VPS requires only OpenSSH.`);
+    return 0;
+  }
+  if (values.version) {
+    console.log((JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { version: string }).version);
+    return 0;
+  }
+  if (positionals.length > 1) throw new Error('Setup accepts one SSH destination. Use --help for usage.');
+  if (command !== 'run' && separator >= 0) throw new Error('Claude arguments are only accepted when launching Claude.');
+  const saved = await readSettings();
+  let destination = values.ssh ?? positionals[0] ?? saved.ssh;
+  if (!destination && command === 'setup' && process.stdin.isTTY) {
+    const terminal = createInterface({ input: process.stdin, output: process.stdout });
+    try { destination = (await terminal.question('VPS SSH alias or user@host: ')).trim(); }
+    finally { terminal.close(); }
+  }
+  if (!destination) throw new Error('First run: claude-tether setup <SSH alias|user@host>. You can also use --ssh for a one-time connection.');
+  const sshConfig = values['ssh-config'] ?? saved.sshConfig;
+  const executable = values.claude ?? saved.claude ?? 'claude';
+  const available = spawnSync(executable, ['--version'], { stdio: 'ignore', timeout: 10_000 });
+  if (available.status !== 0) throw new Error('Local Claude Code is unavailable. Install the official CLI or use --claude /path/to/claude.');
+  const args = separator < 0 ? [] : argv.slice(separator + 1);
+  const tunnel = new SshTunnel({ destination, config: sshConfig, log: message => console.error('[tether] ' + message) });
+  let claude: ReturnType<typeof spawn> | undefined;
+  let stopSignal: NodeJS.Signals | undefined;
+  let killTimer: ReturnType<typeof setTimeout> | undefined;
+  const stop = (signal: NodeJS.Signals) => {
+    // Interactive Ctrl+C already reaches Claude's foreground process group.
+    if (signal === 'SIGINT' && claude) return;
+    stopSignal = signal;
+    claude?.kill(signal);
+    if (claude && !killTimer) {
+      killTimer = setTimeout(() => claude?.kill('SIGKILL'), 2_000);
+      killTimer.unref();
+    }
+    void tunnel.stop();
+  };
+  const signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM', 'SIGHUP'];
+  for (const signal of signals) process.on(signal, stop);
+  let proxy: Awaited<ReturnType<typeof startProxy>> | undefined;
+  try {
+    await tunnel.start();
+    if (stopSignal) return 128 + constants.signals[stopSignal];
+    if (command !== 'run') {
+      if (command === 'setup') {
+        await saveSettings({ ssh: destination, ...(sshConfig ? { sshConfig: resolve(sshConfig) } : {}),
+          claude: /[/\\]/.test(executable) ? resolve(executable) : executable });
+        console.log(`Saved preferences to ${settingsPath()}.\nReady. Run claude-tether from your project directory.`);
+      } else console.log('Local Claude executable and SSH tunnel are ready. No model request was made.');
+      return 0;
+    }
+    proxy = await startProxy((host, port, signal) => tunnel.connect(host, port, signal));
+    if (stopSignal) return 128 + constants.signals[stopSignal];
+    claude = spawn(executable, args, { stdio: 'inherit', env: proxyEnvironment(process.env, proxy.url), shell: false });
+    return await new Promise<number>((resolve, reject) => {
+      claude!.once('error', error => reject(new Error(`Cannot start local Claude Code (${(error as NodeJS.ErrnoException).code ?? 'spawn error'}). Install the official CLI or use --claude.`)));
+      claude!.once('close', (code, signal) => resolve(code ?? (signal ? 128 + constants.signals[signal] : 1)));
+    });
+  } catch (error) {
+    if (stopSignal) return 128 + constants.signals[stopSignal];
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('SSH did not become ready in time. Verify host trust and key/ssh-agent login with ssh, then run setup again.');
+    }
+    throw error;
+  } finally {
+    if (killTimer) clearTimeout(killTimer);
+    for (const signal of signals) process.off(signal, stop);
+    try { await proxy?.close(); } finally { await tunnel.stop(); }
+  }
+}
+
+if (import.meta.main) {
+  main(process.argv.slice(2)).then(code => { process.exitCode = code; }, error => {
+    console.error('[tether] ' + (error instanceof Error ? error.message : 'Startup failed'));
+    process.exitCode = 1;
+  });
+}
