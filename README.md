@@ -1,10 +1,10 @@
-# Claude Tether
+# Tether
 
 **Local Claude Code. Your VPS as the network exit.**
 
-Claude Tether is a lightweight launcher for the official Claude Code CLI. It connects through your VPS over SSH while keeping Claude, your project files, tools, permissions, and sessions on your own machine.
+Tether is a lightweight launcher for the official Claude Code CLI. It connects through your VPS over SSH while keeping Claude, your project files, tools, permissions, and sessions on your own machine.
 
-**Beta: `v0.3.0-beta.1`** · [Release notes](docs/releases/v0.3.0-beta.1.md) · [Operations guide](docs/RUNBOOK.md) · [Contributing](CONTRIBUTING.md)
+**Beta: `v0.3.0-beta.2`** · [Release notes](docs/releases/v0.3.0-beta.2.md) · [Operations guide](docs/RUNBOOK.md) · [Contributing](CONTRIBUTING.md)
 
 ## Quick start
 
@@ -20,7 +20,7 @@ If `claude --version` and key-based `ssh my-vps` already work, no additional ser
 **1. Install the beta**
 
 ```bash
-npm install --global https://github.com/JackXing875/claude-tether/releases/download/v0.3.0-beta.1/claude-tether-0.3.0-beta.1.tgz
+npm install --global https://github.com/JackXing875/claude-tether/releases/download/v0.3.0-beta.2/claude-tether-0.3.0-beta.2.tgz
 ```
 
 The release contains compiled JavaScript and source code. End users do not need TypeScript, Git, a database, or a build step. Beta packages are distributed through GitHub Releases; this command does not rely on an npm registry publication.
@@ -28,17 +28,19 @@ The release contains compiled JavaScript and source code. End users do not need 
 **2. Set up once**
 
 ```bash
-claude-tether setup my-vps
+tether setup my-vps
 ```
 
-Setup checks network isolation and the local Claude executable, then establishes an authenticated SSH tunnel before saving your preferences. It does not store passwords, private keys, or Claude credentials. You can also run `claude-tether setup` and enter the destination when prompted.
+Setup checks network isolation and the local Claude executable, then establishes an authenticated SSH tunnel before saving your preferences. It does not store passwords, private keys, or Claude credentials. You can also run `tether setup` and enter the destination when prompted.
 
 **3. Use it from your project**
 
 ```bash
 cd your-project
-claude-tether
+tether
 ```
+
+The display name and primary command are now **Tether** / `tether`. The package and GitHub repository remain named `claude-tether`; the old `claude-tether` command is retained as a compatibility alias. Existing saved preferences keep working.
 
 That is the everyday command. The official Claude interface opens in your current directory. There are no proxy URLs, ports, or environment variables to configure manually.
 
@@ -46,24 +48,24 @@ That is the everyday command. The official Claude interface opens in your curren
 
 | Command | Purpose |
 | --- | --- |
-| `claude-tether` | Start local Claude using the saved VPS |
-| `claude-tether setup user@host` | Validate and save a new default destination |
-| `claude-tether doctor` | Check the local executable and SSH tunnel without a model request |
-| `claude-tether -- --continue` | Continue using Claude's own session handling |
-| `claude-tether -- --resume SESSION_ID` | Resume a specific Claude session |
-| `claude-tether -- auth login` | Run the official local login flow through the tunnel |
-| `claude-tether --ssh another-vps` | Override the destination for one invocation |
-| `claude-tether --network proxy` | Explicit compatibility mode; settings may bypass the proxy |
-| `claude-tether --ccproxy-port 4000` | Experimental SSH access to a VPS-local ccproxy gateway |
-| `claude-tether --no-ccproxy` | Disable a saved experimental gateway |
-| `claude-tether --help` | Show all options |
+| `tether` | Start local Claude using the saved VPS |
+| `tether setup user@host` | Validate and save a new default destination |
+| `tether doctor` | Check the local executable and SSH tunnel without a model request |
+| `tether -- --continue` | Continue using Claude's own session handling |
+| `tether -- --resume SESSION_ID` | Resume a specific Claude session |
+| `tether -- auth login` | Run the official local login flow through the tunnel |
+| `tether --ssh another-vps` | Override the destination for one invocation |
+| `tether --network proxy` | Explicit compatibility mode; settings may bypass the proxy |
+| `tether --ccproxy-port 4000` | Experimental SSH access to a VPS-local ccproxy gateway |
+| `tether --no-ccproxy` | Disable a saved experimental gateway |
+| `tether --help` | Show all options |
 
 Arguments after `--` are passed to Claude unchanged. Claude's terminal interface, working directory, permissions, project configuration, and exit status are preserved.
 
 For a custom SSH config or Claude executable:
 
 ```bash
-claude-tether setup my-vps --ssh-config ~/.ssh/tether-config --claude /path/to/claude
+tether setup my-vps --ssh-config ~/.ssh/tether-config --claude /path/to/claude
 ```
 
 Preferences are saved in `~/.config/claude-tether/config.json`, or under `$XDG_CONFIG_HOME` when set. Normal use does not require editing this file. SSH ports, identities, and other SSH options remain in standard OpenSSH configuration.
@@ -124,4 +126,4 @@ Development tests require OpenSSH client/server binaries, OpenSSL and bubblewrap
 
 ## License
 
-Claude Tether is licensed under **GPL-3.0-only**. See [LICENSE](LICENSE). This license covers Claude Tether; it does not include or replace the terms for Claude Code or OpenSSH.
+Tether is licensed under **GPL-3.0-only**. See [LICENSE](LICENSE). This license covers Tether; it does not include or replace the terms for Claude Code or OpenSSH.

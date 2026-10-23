@@ -4,9 +4,9 @@ Version 0.3 defaults to `--network isolated`. Existing settings files without a 
 
 ```bash
 sudo apt-get install bubblewrap
-claude-tether setup my-vps
-claude-tether doctor
-claude-tether
+tether setup my-vps
+tether doctor
+tether
 ```
 
 On systems restricting user namespaces, ask the system administrator to allow the installed `/usr/bin/bwrap` through the distribution's AppArmor policy. Do not run the launcher as root or disable the machine's security policy globally. `--network proxy` is an explicit alternative with a weaker routing guarantee.
@@ -33,7 +33,7 @@ This provides an IP egress restriction for Claude and ordinary Linux descendants
 - Files, working directory, terminal input and native Claude arguments remain available. Read/Edit/Bash, stdio MCP, hooks, resume and `/model` were tested with official Claude Code 2.1.267.
 - Tools connecting to a database, development server, HTTP MCP service or SSH agent already running on the host need a different arrangement. Start required local services inside the same Claude session, use stdio MCP, or deliberately select compatibility mode. Host loopback is not exposed automatically.
 - Windows interop is disabled inside the WSL namespace. A tool cannot use `powershell.exe`, `cmd.exe` or a Windows browser as a normal route around this restriction. `/run` is private and `SSH_AUTH_SOCK` is removed from Claude; host-side OpenSSH can still use the caller's agent.
-- Browser login is outside the namespace. Use the official manual URL/code flow when offered. If the CLI requires a callback to host loopback, complete the official login using `claude-tether --network proxy -- auth login`, then return to isolated mode for daily use. That one login uses the weaker mode explicitly; it does not change saved preferences.
+- Browser login is outside the namespace. Use the official manual URL/code flow when offered. If the CLI requires a callback to host loopback, complete the official login using `tether --network proxy -- auth login`, then return to isolated mode for daily use. That one login uses the weaker mode explicitly; it does not change saved preferences.
 - Nested user namespaces are disabled. Tools requiring their own namespace sandbox/container may fail. This release does not enable an automatic unconfined fallback.
 - Background tools launched by Claude stop when the isolated session exits, even if detached. SIGTERM closes the launcher normally. PID namespaces and parent-death supervision also stop its Claude and SSH descendants after launcher SIGKILL. A private temporary socket directory can remain after SIGKILL; it cannot continue forwarding without the parent process.
 - macOS and Windows native do not support this implementation. `--network proxy` remains available but unverified there.

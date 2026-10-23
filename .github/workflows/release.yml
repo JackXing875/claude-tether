@@ -53,5 +53,5 @@ jobs:
             git push origin "refs/tags/$RELEASE_TAG"
           fi
           gh release create "$RELEASE_TAG" artifacts/*.tgz artifacts/SHA256SUMS \
-            --verify-tag --prerelease --title "Claude Tether $RELEASE_TAG" \
+            --verify-tag --prerelease --title "Tether $RELEASE_TAG" \
             --notes-file "docs/releases/$RELEASE_TAG.md"

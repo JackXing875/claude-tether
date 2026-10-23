@@ -4,12 +4,12 @@ The optional `--ccproxy-port` connects a local loopback gateway to **127.0.0.1 o
 
 ```bash
 # Requires an independently configured and reviewed gateway on VPS loopback.
-claude-tether doctor --ccproxy-port 4000
-claude-tether --ccproxy-port 4000
+tether doctor --ccproxy-port 4000
+tether --ccproxy-port 4000
 # Save only when ready to use it routinely:
-claude-tether setup my-vps --ccproxy-port 4000
+tether setup my-vps --ccproxy-port 4000
 # Temporarily bypass a saved gateway while retaining SSH/network isolation:
-claude-tether --no-ccproxy
+tether --no-ccproxy
 ```
 
 The SSH key must permit `127.0.0.1:4000` in addition to the destinations used by ordinary HTTPS. A key restricted to `*:443` will reject this connection. `doctor` checks TCP reachability only, not gateway identity, authentication or model compatibility.

@@ -25,15 +25,15 @@ export async function main(argv: string[]): Promise<number> {
     claude: { type: 'string' }, help: { type: 'boolean', short: 'h' }, version: { type: 'boolean', short: 'v' },
   } });
   if (values.help) {
-    console.log(`Usage: claude-tether [options] -- [Claude arguments]
-       claude-tether setup [SSH alias|user@host] [options]
-       claude-tether doctor [options]
+    console.log(`Usage: tether [options] -- [Claude arguments]
+       tether setup [SSH alias|user@host] [options]
+       tether doctor [options]
 
 Runs official Claude Code locally through an automatically reconnected SSH tunnel.
 
-First use:  claude-tether setup my-vps
-Daily use:  claude-tether
-Resume:     claude-tether -- --continue
+First use:  tether setup my-vps
+Daily use:  tether
+Resume:     tether -- --continue
 
 Options:
   --ssh <destination>   Override the saved SSH destination for this invocation
@@ -65,7 +65,7 @@ First verify the host key and key/agent login with ssh. VPS requires only OpenSS
     try { destination = (await terminal.question('VPS SSH alias or user@host: ')).trim(); }
     finally { terminal.close(); }
   }
-  if (!destination) throw new Error('First run: claude-tether setup <SSH alias|user@host>. You can also use --ssh for a one-time connection.');
+  if (!destination) throw new Error('First run: tether setup <SSH alias|user@host>. You can also use --ssh for a one-time connection.');
   const sshConfig = values['ssh-config'] ?? saved.sshConfig;
   const executable = values.claude ?? saved.claude ?? 'claude';
   const network = networkMode(values.network ?? saved.network ?? 'isolated');
@@ -112,7 +112,7 @@ First verify the host key and key/agent login with ssh. VPS requires only OpenSS
         await saveSettings({ ssh: destination, ...(sshConfig ? { sshConfig: resolve(sshConfig) } : {}),
           claude: /[/\\]/.test(executable) ? resolve(executable) : executable,
           network, ...(ccproxyPort ? { ccproxyPort } : {}) });
-        console.log(`Saved preferences to ${settingsPath()}.\nReady. Run claude-tether from your project directory.`);
+        console.log(`Saved preferences to ${settingsPath()}.\nReady. Run tether from your project directory.`);
       } else console.log(`Local Claude executable and SSH tunnel are ready (network: ${network}${ccproxyPort ? ', ccproxy TCP reachable; authentication not tested' : ''}). No model request was made.`);
       return 0;
     }

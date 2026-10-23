@@ -31,13 +31,13 @@ test('help works without SSH or a Claude installation', async () => {
 test('npm-style symlink entry points execute the CLI', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'tether-bin-test-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
-  const link = join(directory, 'claude-tether');
+  const link = join(directory, 'tether');
   await symlink(cli, link);
   const child = spawn(process.execPath, [link, '--help']);
   let output = '';
   child.stdout.on('data', chunk => { output += String(chunk); });
   const [code] = await once(child, 'close');
-  assert.equal(code, 0); assert.match(output, /Usage: claude-tether/);
+  assert.equal(code, 0); assert.match(output, /Usage: tether/);
 });
 
 test('launcher preserves working directory, literal arguments and Claude exit status', { timeout: 10_000 }, async t => {
@@ -90,7 +90,7 @@ test('one-time setup enables plain launch and doctor without modifying saved pre
   };
   const setup = await invoke(['setup', 'test-vps', '--ssh-config', './ssh_config', '--claude', process.execPath]);
   assert.equal(setup.code, 0, setup.stderr);
-  assert.match(setup.stdout, /Run claude-tether from your project directory/);
+  assert.match(setup.stdout, /Run tether from your project directory/);
   const path = join(fixture.directory, 'claude-tether', 'config.json');
   const saved = await readFile(path, 'utf8');
   assert.deepEqual(JSON.parse(saved), { ssh: 'test-vps', sshConfig: fixture.config, claude: process.execPath, network: 'isolated' });

@@ -28,9 +28,9 @@ No additional public port, TLS certificate, VPS Node runtime, Claude installatio
 ## Setup and everyday use
 
 ```bash
-claude-tether setup my-vps
+tether setup my-vps
 cd your-project
-claude-tether
+tether
 ```
 
 Setup checks bubblewrap/user namespace support, the local Claude executable inside isolation, and the SSH/SOCKS listener. It saves preferences only after those checks pass, using an atomic replacement and a private file mode. It does not make a model request or prove that the VPS can reach every upstream destination. Existing working preferences survive a failed setup.
@@ -38,9 +38,9 @@ Setup checks bubblewrap/user namespace support, the local Claude executable insi
 To change the default, run setup again. To override it temporarily, use `--ssh`, `--ssh-config`, `--claude`, `--network`, `--ccproxy-port` or `--no-ccproxy` on a normal launch. A temporary override does not modify saved preferences.
 
 ```bash
-claude-tether setup my-vps --ssh-config ~/.ssh/tether-config
-claude-tether --ssh another-vps
-claude-tether doctor
+tether setup my-vps --ssh-config ~/.ssh/tether-config
+tether --ssh another-vps
+tether doctor
 ```
 
 Preferences live at `$XDG_CONFIG_HOME/claude-tether/config.json`, falling back to `~/.config/claude-tether/config.json`. Saved file paths are absolute, so launching from another project does not change their meaning. Delete that file to remove Tether's preferences; Claude and SSH credentials are stored elsewhere and are unaffected.
@@ -50,15 +50,15 @@ Run Tether from the project you want Claude to work on. `npm --prefix ...` chang
 ## Official Claude login and sessions
 
 ```bash
-claude-tether -- auth login
-claude-tether -- auth status
-claude-tether -- --continue
-claude-tether -- --resume SESSION_ID
+tether -- auth login
+tether -- auth status
+tether -- --continue
+tether -- --resume SESSION_ID
 ```
 
 The official local CLI manages authentication and refresh. Tether does not export credentials or clear existing API key/provider settings. Confirm your account and authentication method in Claude itself.
 
-A browser opened for authorization does not inherit the CLI's proxy environment. Default isolation disables Windows interop and separates host loopback. Use the official manual URL/code login flow if offered; if a browser callback requires host loopback, explicitly use `claude-tether --network proxy -- auth login` for that login and then return to isolated mode. If the authorization page cannot load, use the browser's supported network configuration. Do not paste authorization codes or tokens into issue reports or Tether settings.
+A browser opened for authorization does not inherit the CLI's proxy environment. Default isolation disables Windows interop and separates host loopback. Use the official manual URL/code login flow if offered; if a browser callback requires host loopback, explicitly use `tether --network proxy -- auth login` for that login and then return to isolated mode. If the authorization page cannot load, use the browser's supported network configuration. Do not paste authorization codes or tokens into issue reports or Tether settings.
 
 An earlier VPS-based prototype may have left software on the server. That installation is not used by this version; removal is a separate administrative action. Local Claude authentication is independent of any login saved on the VPS.
 
@@ -73,7 +73,7 @@ claude-pro() (
   unset CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_USE_VERTEX CLAUDE_CODE_USE_FOUNDRY
   export CLAUDE_CONFIG_DIR="$HOME/.config/claude-tether/pro/claude"
   export XDG_CONFIG_HOME="$HOME/.config/claude-tether/pro/xdg"
-  claude-tether --ssh my-vps -- "$@"
+  tether --ssh my-vps -- "$@"
 )
 claude-pro auth login --claudeai
 claude-pro auth status
@@ -120,7 +120,7 @@ Tether logs connection state and OpenSSH's diagnostics. It does not log model re
 
 ## Upgrade and uninstall
 
-Install the tarball from a newer GitHub prerelease using the same global npm command shown in its release notes. Saved preferences remain outside the package. Upgrading from 0.2 selects isolated mode unless `network: "proxy"` was explicitly saved; install bubblewrap first. The distribution includes the full operating and validation documentation.
+Install the tarball from a newer GitHub prerelease using the same global npm command shown in its release notes. Version 0.3.0-beta.2 adds the short `tether` command while retaining `claude-tether` as an alias; the package and configuration directory keep their existing names. If an old alpha installation still owns a `tether` command, upgrade that npm installation or back up its launcher before replacing it. Verify `command -v tether` and `tether --version` after upgrading. Saved preferences remain outside the package. Upgrading from 0.2 selects isolated mode unless `network: "proxy"` was explicitly saved; install bubblewrap first. The distribution includes the full operating and validation documentation.
 
 ```bash
 npm uninstall --global claude-tether

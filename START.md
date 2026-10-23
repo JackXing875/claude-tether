@@ -1,6 +1,6 @@
 # Architecture and development notes
 
-Claude Tether runs the official Claude Code CLI locally and uses an SSH-accessible VPS as the HTTP(S) network exit. The application should remain small enough to understand without a framework or a service deployment.
+Tether runs the official Claude Code CLI locally and uses an SSH-accessible VPS as the HTTP(S) network exit. The application should remain small enough to understand without a framework or a service deployment.
 
 ## Responsibilities
 
@@ -20,7 +20,7 @@ The default path has no custom VPS daemon, remote agent, tool bridge, database o
 ## Design rules
 
 1. Keep runtime dependencies at zero unless a concrete requirement justifies one.
-2. Keep the daily entry point to `claude-tether`; prefer a one-time setup command over manual configuration.
+2. Keep the daily entry point to `tether`; prefer a one-time setup command over manual configuration.
 3. Retain the caller's working directory, terminal behavior, authentication settings and literal Claude arguments.
 4. Keep SSH reconnection independent of the local Claude process. Do not replay requests or restart a complete agent task.
 5. Apply connection deadlines only to connection establishment, never to an established model stream.
