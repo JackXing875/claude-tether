@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
@@ -9,8 +9,8 @@ const directory = await mkdtemp(join(tmpdir(), 'tether-package-test-'));
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 try {
   const [{ filename, files }] = JSON.parse(execFileSync(npm, ['pack', '--ignore-scripts', '--json', '--pack-destination', directory], { encoding: 'utf8' }));
-  for (const path of ['dist/src/cli.js', 'dist/src/isolated-child.js', 'src/cli.ts', 'src/settings.ts', 'tsconfig.json', 'LICENSE',
-    'docs/NETWORK.md', 'docs/CCPROXY.md', 'docs/TEST-REPORT.md', 'CONTRIBUTING.md', 'SECURITY.md', 'START.md']) {
+  for (const path of ['dist/src/cli.js', 'dist/src/vscode.js', 'dist/src/isolated-child.js', 'src/cli.ts', 'src/vscode.ts', 'src/settings.ts', 'tsconfig.json', 'LICENSE',
+    'docs/VSCODE.md', 'docs/NETWORK.md', 'docs/CCPROXY.md', 'docs/TEST-REPORT.md', 'CONTRIBUTING.md', 'SECURITY.md', 'START.md']) {
     assert.ok(files.some(file => file.path === path), `Missing package file: ${path}`);
   }
   assert.ok(files.every(file => !/^(tests|node_modules)\//.test(file.path)));
@@ -24,5 +24,8 @@ try {
     assert.match(execFileSync(executable, ['--help'], { encoding: 'utf8' }), /Usage: tether/);
     assert.match(execFileSync(executable, ['--help'], { encoding: 'utf8' }), /tether setup/);
   }
-  console.log('Package installation, tether and compatibility entry points, version and source contents verified.');
+  const vscode = spawnSync(join(directory, 'bin', 'tether-vscode'), [], { encoding: 'utf8', env });
+  assert.equal(vscode.status, 1); assert.equal(vscode.stdout, '');
+  assert.match(vscode.stderr, /claudeCode.claudeProcessWrapper/);
+  console.log('Package installation, CLI and VS Code entry points, version and source contents verified.');
 } finally { await rm(directory, { recursive: true, force: true }); }

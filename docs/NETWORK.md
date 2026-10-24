@@ -11,6 +11,14 @@ tether
 
 On systems restricting user namespaces, ask the system administrator to allow the installed `/usr/bin/bwrap` through the distribution's AppArmor policy. Do not run the launcher as root or disable the machine's security policy globally. `--network proxy` is an explicit alternative with a weaker routing guarantee.
 
+## GPU access
+
+Isolated mode keeps the host filesystem and local compute available. Starting with 0.3.0-beta.3, it mounts existing GPU character devices into the otherwise minimal `/dev`: WSL `/dev/dxg`, NVIDIA numbered/control/UVM/modeset and capability devices, DRM card/render nodes, and AMD `/dev/kfd`. Symlinks and unrelated devices are excluded. This does not mount the entire host `/dev`, grant extra host permissions, or restore Windows interop or external IP routes.
+
+Earlier versions hid those devices, so `nvidia-smi` and CUDA could report that GPU access was blocked even when they worked in an ordinary terminal. Upgrade and start a new Tether session. Test the same Python environment both outside and inside Tether: a CPU-only PyTorch build, missing driver or host device permission cannot be fixed by a network launcher. WSL NVIDIA detection and a PyTorch CUDA matrix multiplication were verified; native Linux NVIDIA/AMD hardware still needs separate validation.
+
+This is network isolation, not a promise to hide the host hardware or operating system from Claude. Claude's own optional Bash sandbox is another layer and can impose additional restrictions; do not disable Tether's networking to solve a device or Python-environment issue.
+
 ## What goes through the VPS
 
 | Traffic | Default isolated mode | Explicit proxy mode |
