@@ -1,6 +1,6 @@
 {
   "name": "claude-tether",
-  "version": "0.3.0-beta.2",
+  "version": "0.3.0-beta.3",
   "type": "module",
   "license": "GPL-3.0-only",
   "author": "JackXing875",
@@ -16,7 +16,8 @@
   "description": "Run local Claude Code with isolated networking through a reconnecting SSH tunnel",
   "bin": {
     "tether": "dist/src/cli.js",
-    "claude-tether": "dist/src/cli.js"
+    "claude-tether": "dist/src/cli.js",
+    "tether-vscode": "dist/src/vscode.js"
   },
   "files": ["dist/src", "src", "tsconfig.json", ".nvmrc", "README.md", "LICENSE", "CHANGELOG.md", "CONTRIBUTING.md", "SECURITY.md", "START.md", "docs"],
   "engines": {

@@ -1,13 +1,15 @@
 # Beta validation record
 
-Target: `0.3.0-beta.1`. Recorded on 2026-10-23 (Asia/Shanghai).
+Target: `0.3.0-beta.3`. Recorded on 2026-10-24 (Asia/Shanghai).
 
 Validation uses Linux x64, Node.js 24.14.0, TypeScript 7.0.2 and OpenSSH 10.0p2. Tests create temporary loopback sshd and TLS services with isolated keys and bubblewrap namespaces; they do not access personal SSH configuration, a real VPS or a Claude account.
 
-Current local results: **29 tests passed, 0 failed, 0 cancelled, 0 skipped**, including the TypeScript build. The actual packed tarball installed and ran successfully without access to the checkout's TypeScript toolchain. The production dependency audit reported **0 vulnerabilities**. Documentation links and package/lockfile version and license consistency were also checked.
+Current local results: **34 tests passed, 0 failed, 0 cancelled, 0 skipped**, including the TypeScript build. The actual packed tarball installed and ran successfully without access to the checkout's TypeScript toolchain. The production dependency audit reported **0 vulnerabilities**. Documentation links and package/lockfile version and license consistency were also checked.
 
 ## Automated coverage
 
+- VS Code wrapper: extension-supplied executable, duplex stdin/stdout, EOF, literal SDK arguments, profile/cwd preservation, cancellation, detached-child cleanup and exit status.
+- GPU character-device identity inside isolation; exclusion of ordinary files, symlinks and symlinked device directories. Real WSL CUDA compute is recorded separately in the [SDK/GPU report](VSCODE-LIVE-REPORT.md).
 - Rootless network isolation: HTTP through real SSH, blocked direct IPv4/IPv6/UDP/DNS/host loopback, shared namespace for child tools, and no fallback when isolation is unavailable.
 - Private Unix bridge response draining and large-upload backpressure; cancellation during connection establishment.
 - Isolated gateway preserves model/tool payloads, beta/auth headers, streamed responses and 429/Retry-After without replay.
@@ -23,7 +25,7 @@ Current local results: **29 tests passed, 0 failed, 0 cancelled, 0 skipped**, in
 - One-time setup followed by launch using saved preferences and doctor; failed setup and one-time overrides preserve existing settings.
 - Preferences validation, private file permissions and atomic replacement without leftover temporary files.
 
-`npm test` runs the strict TypeScript build and transport/CLI/settings tests. `npm run test:package` packs the actual distributable, installs it into a temporary npm prefix, invokes its executable, and checks the version and included source files.
+`npm test` runs the strict TypeScript build and transport/CLI/settings/adapter tests. `npm run test:package` packs the actual distributable, installs it into a temporary npm prefix, invokes its three executable entry points, and checks the version and included source files.
 
 ## Validation boundaries
 

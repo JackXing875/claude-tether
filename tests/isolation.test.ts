@@ -1,14 +1,40 @@
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
-import { readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
 import test from 'node:test';
 import { listen, sshFixture, until } from './helpers.js';
+import { gpuDevices, namespaceArgs } from '../src/isolation.js';
 
 const cli = new URL('../src/cli.js', import.meta.url).pathname;
+
+test('GPU mounts preserve host device identity inside the isolated namespace', async () => {
+  const devices = gpuDevices();
+  const expected = await Promise.all(devices.map(async path => ({ path, rdev: (await stat(path)).rdev, character: true })));
+  const probe = spawnSync('bwrap', namespaceArgs([process.execPath, '-e', `
+    const fs = require('node:fs');
+    console.log(JSON.stringify(${JSON.stringify(devices)}.map(path => {
+      const s = fs.statSync(path); return { path, rdev: s.rdev, character: s.isCharacterDevice() };
+    })));
+  `]), { encoding: 'utf8', timeout: 10_000 });
+  assert.equal(probe.status, 0, probe.stderr);
+  assert.deepEqual(JSON.parse(probe.stdout), expected);
+});
+
+test('GPU discovery excludes ordinary files, symlinks and symlinked device directories', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'tether-gpu-test-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await writeFile(join(root, 'dxg'), 'not a device');
+  await symlink('/dev/null', join(root, 'nvidia0'));
+  await symlink('/dev', join(root, 'dri'));
+  await mkdir(join(root, 'nvidia-caps'));
+  await symlink('/dev/zero', join(root, 'nvidia-caps/nvidia-cap1'));
+  assert.deepEqual(gpuDevices(root), []);
+});
 
 test('isolated Claude and tools use SSH for HTTP while direct IPv4, IPv6, UDP and host loopback fail closed', { timeout: 15_000 }, async t => {
   const fixture = await sshFixture(t);

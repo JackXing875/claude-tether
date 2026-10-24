@@ -103,6 +103,8 @@ The optional `--ccproxy-port` connects a gateway on VPS loopback over SSH; read 
 
 ## Troubleshooting
 
+For the official VS Code native panel, use the dedicated [`tether-vscode` adapter](VSCODE.md) in the Linux/WSL extension host. An ordinary terminal alias is not a compatible process wrapper.
+
 | Symptom | Action |
 | --- | --- |
 | Local Claude is unavailable | Install the official CLI, check `claude --version`, or specify `--claude` |
@@ -112,6 +114,7 @@ The optional `--ccproxy-port` connects a gateway on VPS loopback over SSH; read 
 | Proxy `502` | A tunnel or destination connection could not be established; inspect SSH and VPS outbound access |
 | Network isolation unavailable | Install bubblewrap 0.9+ and check the distribution user-namespace policy; see NETWORK.md |
 | A tool reports network unreachable or cannot reach host localhost | Check isolated-mode compatibility; do not assume a VPS outage |
+| GPU works in an ordinary terminal but is hidden in Tether | Upgrade to 0.3.0-beta.3 or later, start a new session and use the same Python environment; see NETWORK.md |
 | ccproxy connection refused/prohibited | Check the gateway loopback listener and SSH key forwarding restrictions |
 | Model output is interrupted | Use Claude's own retry/session recovery; Tether cannot resume a broken TCP stream |
 | Invalid settings | Inspect the named local preferences file; it accepts `ssh`, `sshConfig`, `claude`, `network` (isolated/proxy) and `ccproxyPort` strings |

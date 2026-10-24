@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, lstatSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export type NetworkMode = 'isolated' | 'proxy';
@@ -9,10 +10,31 @@ export function networkMode(value: string): NetworkMode {
   return value;
 }
 
+// Keep compute devices available without exposing all of the host's /dev.
+// Symlinks, ordinary files and unrelated devices are deliberately excluded.
+export function gpuDevices(root = '/dev'): string[] {
+  const devices: string[] = [];
+  for (const [directory, pattern] of [
+    [root, /^(dxg|kfd|nvidia(?:\d+|ctl|uvm|uvm-tools|modeset))$/],
+    [join(root, 'dri'), /^(card\d+|renderD\d+)$/],
+    [join(root, 'nvidia-caps'), /^nvidia-cap\d+$/],
+  ] as const) {
+    try {
+      if (!lstatSync(directory).isDirectory()) continue;
+      for (const entry of readdirSync(directory, { withFileTypes: true })) {
+        if (pattern.test(entry.name) && entry.isCharacterDevice()) devices.push(join(directory, entry.name));
+      }
+    } catch (error) {
+      if (!['ENOENT', 'EACCES'].includes((error as NodeJS.ErrnoException).code ?? '')) throw error;
+    }
+  }
+  return devices.sort();
+}
+
 export function namespaceArgs(command: string[]): string[] {
   return ['--unshare-user', '--unshare-net', '--unshare-pid', '--unshare-ipc',
     '--disable-userns', '--cap-drop', 'ALL', '--bind', '/', '/', '--proc', '/proc',
-    '--dev', '/dev', '--tmpfs', '/run',
+    '--dev', '/dev', ...gpuDevices().flatMap(path => ['--dev-bind', path, path]), '--tmpfs', '/run',
     // WSL interop would otherwise start Windows programs outside this namespace.
     ...(existsSync('/init') ? ['--ro-bind', '/dev/null', '/init'] : []),
     '--unsetenv', 'WSL_INTEROP', '--unsetenv', 'WSLENV', '--unsetenv', 'SSH_AUTH_SOCK',

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0-beta.3 — 2026-10-24
+
+- Add `tether-vscode`, an official VS Code process-wrapper adapter that selects the bundled CLI and preserves bidirectional SDK communication, permissions and lifecycle.
+- Restore local GPU device access in isolated mode without opening external IP routes or Windows interop.
+- Document Remote WSL setup and the distinction between isolated Claude child traffic and requests made by the extension host itself.
+- Verify real Pro SDK file tools, MCP/hooks and permission callbacks, Sonnet-to-Opus switching, and WSL PyTorch CUDA computation. Add wrapper and GPU regression coverage.
+
 ## 0.3.0-beta.2 — 2026-10-24
 
 - Use Tether as the display name and `tether` as the primary installed command.
