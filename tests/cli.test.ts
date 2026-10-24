@@ -28,6 +28,18 @@ test('help works without SSH or a Claude installation', async () => {
   assert.equal(code, 0); assert.match(output, /Runs official Claude Code locally/);
 });
 
+test('update help and source-checkout protection do not require a configured VPS or Claude', async () => {
+  for (const args of [['update', '--help'], ['update']]) {
+    const child = spawn(process.execPath, [cli, ...args], { env: { ...process.env, XDG_CONFIG_HOME: '/missing-tether-config' } });
+    let output = '';
+    child.stdout.on('data', chunk => { output += String(chunk); });
+    child.stderr.on('data', chunk => { output += String(chunk); });
+    const [code] = await once(child, 'close');
+    assert.equal(code, args.length === 2 ? 0 : 1);
+    assert.match(output, args.length === 2 ? /Usage: tether update/ : /Source checkouts/);
+  }
+});
+
 test('npm-style symlink entry points execute the CLI', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'tether-bin-test-'));
   t.after(() => rm(directory, { recursive: true, force: true }));

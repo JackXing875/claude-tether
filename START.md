@@ -10,6 +10,7 @@ Tether runs the official Claude Code CLI locally and uses an SSH-accessible VPS 
 | `src/cli.ts` | Local | Commands, executable checks, process environment and lifecycle |
 | `src/vscode.ts` | Local | Official extension wrapper contract: bundled binary, literal SDK arguments and duplex stdio |
 | `src/settings.ts` | Local | Small, atomic preferences file; no credentials |
+| `src/update.ts` | Local | GitHub release discovery, HTTPS/checksum verification, staged self-update and rollback |
 | `src/tunnel.ts` | Local | OpenSSH lifecycle, readiness, keepalives and bounded reconnect backoff |
 | `src/proxy.ts` | Local | HTTP and HTTPS CONNECT to SOCKS5, remote DNS and byte streams |
 | `src/isolation.ts`, `src/isolated-child.ts` | Local | Linux network/PID namespaces, native CLI lifecycle |
@@ -32,6 +33,8 @@ The default path has no custom VPS daemon, remote agent, tool bridge, database o
 The tunnel changes the network exit, not the identity or local environment described to a model. Project content required by Claude can still reach the upstream provider. A broken TCP stream cannot be made lossless by reconnecting SSH.
 
 The VS Code adapter confines the spawned Claude process, not the entire extension host. Keep SDK stdin/stdout free of launcher text. Native panel callbacks can use stdio; do not open general host loopback access to accommodate a separate CLI IDE connection. GPU device access is independent of the IP boundary and uses explicit character-device mounts.
+
+Self-update is an explicit host-side maintenance command, independent of Claude and SSH. Use published GitHub assets, retain TLS/checksum verification, stage with npm scripts disabled and never overwrite a source checkout. Preserve the invoked installation path and profile/configuration files. Keep current sessions running and retain a recovery copy; do not claim that the two-rename activation survives arbitrary power loss atomically.
 
 ## Development workflow
 

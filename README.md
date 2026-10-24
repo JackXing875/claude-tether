@@ -6,7 +6,7 @@ Tether is a lightweight launcher for the official Claude Code CLI. It connects t
 
 The official **VS Code native panel** can use the same transport through `tether-vscode`; see the [extension setup](docs/VSCODE.md). Linux/WSL GPU compute remains available inside network isolation.
 
-**Beta: `v0.3.0-beta.3`** · [Release notes](docs/releases/v0.3.0-beta.3.md) · [Operations guide](docs/RUNBOOK.md) · [Contributing](CONTRIBUTING.md)
+**Beta: `v0.3.0-beta.4`** · [Release notes](docs/releases/v0.3.0-beta.4.md) · [Operations guide](docs/RUNBOOK.md) · [Contributing](CONTRIBUTING.md)
 
 ## Quick start
 
@@ -22,7 +22,7 @@ If `claude --version` and key-based `ssh my-vps` already work, no additional ser
 **1. Install the beta**
 
 ```bash
-npm install --global https://github.com/JackXing875/claude-tether/releases/download/v0.3.0-beta.3/claude-tether-0.3.0-beta.3.tgz
+npm install --global https://github.com/JackXing875/claude-tether/releases/download/v0.3.0-beta.4/claude-tether-0.3.0-beta.4.tgz
 ```
 
 The release contains compiled JavaScript and source code. End users do not need TypeScript, Git, a database, or a build step. Beta packages are distributed through GitHub Releases; this command does not rely on an npm registry publication.
@@ -53,6 +53,8 @@ That is the everyday command. The official Claude interface opens in your curren
 | `tether` | Start local Claude using the saved VPS |
 | `tether setup user@host` | Validate and save a new default destination |
 | `tether doctor` | Check the local executable and SSH tunnel without a model request |
+| `tether update` | Download, verify and install the newest GitHub release |
+| `tether update --check` | Check for an update without changing the installation |
 | `tether -- --continue` | Continue using Claude's own session handling |
 | `tether -- --resume SESSION_ID` | Resume a specific Claude session |
 | `tether -- auth login` | Run the official local login flow through the tunnel |
@@ -63,6 +65,8 @@ That is the everyday command. The official Claude interface opens in your curren
 | `tether --help` | Show all options |
 
 Arguments after `--` are passed to Claude unchanged. Claude's terminal interface, working directory, permissions, project configuration, and exit status are preserved.
+
+From beta.4 onward, use `tether update` for future upgrades. Beta installations receive newer betas or stable releases; stable installations stay on stable releases. Updates preserve login, SSH preferences and VS Code launcher paths. Start a new Claude session after upgrading. Older versions need the installation command above once. See [upgrade details](docs/RUNBOOK.md#upgrade-and-uninstall).
 
 For a custom SSH config or Claude executable:
 

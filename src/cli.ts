@@ -12,9 +12,18 @@ import { readSettings, saveSettings, settingsPath } from './settings.js';
 import { proxyEnvironment } from './environment.js';
 import { localSocket, startBridge } from './bridge.js';
 import { checkIsolation, isolatedCommand, namespaceArgs, networkMode } from './isolation.js';
+import { update } from './update.js';
 export { proxyEnvironment } from './environment.js';
 
 export async function main(argv: string[]): Promise<number> {
+  if (argv[0] === 'update') {
+    const { values } = parseArgs({ args: argv.slice(1), options: {
+      check: { type: 'boolean' }, help: { type: 'boolean', short: 'h' },
+    } });
+    if (values.help) console.log('Usage: tether update [--check]\nInstall the newest GitHub release (beta installations include newer betas).\n--check reports an available update without installing it. No Claude login or VPS is required.');
+    else await update({ check: values.check });
+    return 0;
+  }
   const separator = argv.indexOf('--');
   const ownArgs = argv.slice(0, separator < 0 ? argv.length : separator);
   const command = ['setup', 'doctor'].includes(ownArgs[0] ?? '') ? ownArgs.shift()! : 'run';
@@ -28,12 +37,14 @@ export async function main(argv: string[]): Promise<number> {
     console.log(`Usage: tether [options] -- [Claude arguments]
        tether setup [SSH alias|user@host] [options]
        tether doctor [options]
+       tether update [--check]
 
 Runs official Claude Code locally through an automatically reconnected SSH tunnel.
 
 First use:  tether setup my-vps
 Daily use:  tether
 Resume:     tether -- --continue
+Upgrade:    tether update
 
 Options:
   --ssh <destination>   Override the saved SSH destination for this invocation

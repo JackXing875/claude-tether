@@ -123,7 +123,31 @@ Tether logs connection state and OpenSSH's diagnostics. It does not log model re
 
 ## Upgrade and uninstall
 
-Install the tarball from a newer GitHub prerelease using the same global npm command shown in its release notes. Version 0.3.0-beta.2 adds the short `tether` command while retaining `claude-tether` as an alias; the package and configuration directory keep their existing names. If an old alpha installation still owns a `tether` command, upgrade that npm installation or back up its launcher before replacing it. Verify `command -v tether` and `tether --version` after upgrading. Saved preferences remain outside the package. Upgrading from 0.2 selects isolated mode unless `network: "proxy"` was explicitly saved; install bubblewrap first. The distribution includes the full operating and validation documentation.
+Starting with `0.3.0-beta.4`:
+
+```bash
+tether update          # fetch, verify and install the newest release
+tether update --check  # report availability without changing files
+tether --version
+```
+
+The updater selects the highest published stable/beta version, including newer betas when the installed version is a beta. A stable installation only receives stable releases. Drafts, unsupported tag formats and downgrades are excluded. Already-current installations do not download or reinstall the package. No Git checkout, GitHub token, Claude login or reachable VPS is needed.
+
+The tarball and `SHA256SUMS` come from this repository's GitHub Releases over verified HTTPS. SHA-256 is checked before npm runs; the GitHub asset digest is also checked when present. npm stages the verified local tarball offline with lifecycle scripts disabled and engine requirements enforced. Version, package layout and executable checks must pass before replacing the invoked installation. Download, integrity and staging failures leave the old installation intact; a failed activation rename restores the previous package. The updater retains a backup and prints its location.
+
+The package path and existing npm executable links stay the same, including `tether-vscode`. Saved preferences, SSH keys, Claude profiles and VS Code settings are outside the package and are not modified. Running sessions are not restarted: open a new CLI/panel session to use the new version. This updates **Tether only**, not the official Claude binary, Node.js, the VS Code extension or a remote machine.
+
+Self-update supports writable global npm prefixes on Linux/WSL and macOS; macOS transport compatibility remains unverified. It uses the running package's location rather than npm's default prefix, so it also works with `npm install --global --prefix /your/path`. Source checkouts, linked packages and Windows-native layouts are not overwritten. Tether does not request sudo. If the directory is not writable, install into a user-owned prefix using the release's npm command. A Node.js engine mismatch requires updating Node before retrying.
+
+Update downloads run on the **host network**, separately from Claude's SSH tunnel, and honor the host's `HTTPS_PROXY`/`https_proxy` and `NO_PROXY` settings. A configured proxy failure does not fall back to direct access. GitHub API rate limits or download errors stop the update; retry later. These public requests contain no Claude credentials.
+
+Concurrent updates to one installation are locked. If a process was killed abruptly, the error identifies the lock file; remove it only after verifying no updater is still running. Normal cancellation removes the lock and staging directory. Activation uses two filesystem renames with rollback on errors, not a crash-proof filesystem transaction: after a machine crash during activation, restore the retained `claude-tether` backup directory to its original `lib/node_modules/claude-tether` path, or reinstall the release tarball. Backups are not automatically deleted; after closing old sessions and verifying the upgrade, remove obsolete backup directories if desired.
+
+For beta.3 or earlier, install beta.4 or later once using the npm command in its release notes. If a personal shell wrapper puts every argument after `--`, route `update` to Tether **before** that separator; otherwise it becomes a Claude argument. Use stable package paths in custom CLI and VS Code wrappers. An `update` intended for Claude can still be passed explicitly as `tether -- update`.
+
+Version 0.3.0-beta.2 added the short `tether` command while retaining `claude-tether` as an alias. If an old alpha installation still owns a `tether` command, upgrade that npm installation or back up its launcher before replacing it. Verify `command -v tether` after upgrading. Upgrading from 0.2 selects isolated mode unless `network: "proxy"` was explicitly saved; install bubblewrap first.
+
+To uninstall, use the same npm prefix used for installation:
 
 ```bash
 npm uninstall --global claude-tether
