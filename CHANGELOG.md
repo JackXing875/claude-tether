@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0-beta.4 — 2026-10-24
+
+- Add `tether update` and `tether update --check` using published GitHub release assets, with numeric beta ordering, stable-channel preservation and no automatic downgrades.
+- Verify HTTPS, SHA-256 manifests and available GitHub asset digests before staging an offline npm installation with lifecycle scripts disabled and engine checks enabled.
+- Preserve the invoked package path, CLI/VS Code links and external preferences; retain a previous-package backup and roll back failed activation renames.
+- Reject source checkouts and unwritable installations, serialize concurrent upgrades, and clean up after normal cancellation. Document host-network scope and manual recovery after abrupt process/machine failure.
+- Exercise successful and failed upgrades, TLS/redirect/download boundaries, cancellation, rollback and the shipped updater in the packed installation test.
+
 ## 0.3.0-beta.3 — 2026-10-24
 
 - Add `tether-vscode`, an official VS Code process-wrapper adapter that selects the bundled CLI and preserves bidirectional SDK communication, permissions and lifecycle.

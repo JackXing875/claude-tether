@@ -28,6 +28,8 @@ Point `claudeCode.claudeProcessWrapper` at that script. Do not point it at `teth
 
 The adapter shares Tether's saved preferences, working directory and environment. It keeps stdin/stdout available for the bidirectional SDK protocol and writes diagnostics only to stderr. It preserves exit status and cancellation and uses the same reconnect/cleanup behavior as the terminal launcher. It does not patch the official extension or bypass its permissions.
 
+Run `tether update` in the environment containing that installation to upgrade both terminal and VS Code entry points. The updater keeps their paths and your extension settings intact; reopen the Claude conversation to use the new code. Custom wrappers should point at the same stable package location. It does not update the official VS Code extension itself.
+
 ## An existing separate Pro profile
 
 If your terminal launcher sets `CLAUDE_CONFIG_DIR` and `XDG_CONFIG_HOME`, the extension needs the same profile and Tether preferences. Add these entries to the existing `claudeCode.environmentVariables` array, preserving unrelated entries:
