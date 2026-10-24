@@ -28,7 +28,7 @@ The host had an NVIDIA GeForce RTX 4060 Laptop GPU with driver 617.42. Before th
 
 After the change, both a direct namespace probe and the real Claude Bash tool successfully ran **PyTorch 2.9.1+cu128 / CUDA 12.8** on that GPU. A 4×4 matrix multiplication completed on CUDA; its sum was **3920**, matching the CPU result. The real Claude tool also verified that direct IP access stayed blocked.
 
-Native Linux NVIDIA, AMD/ROCm and DRM hardware paths are supported by explicit device discovery but were not tested on physical hardware here. Driver installation, host device permissions, CPU-only Python packages, multi-GPU collectives and the official CLI's separate optional Bash sandbox have their own requirements.
+Native Linux NVIDIA, AMD/ROCm and DRM hardware were not tested in this beta.3 WSL validation. Subsequent native NVIDIA testing found a device-name bug in beta.3/beta.4; beta.5 fixes it and records driver initialization and PyTorch discovery in the [native GPU report](GPU-LIVE-REPORT.md). Driver installation, host device permissions, CPU-only Python packages, multi-GPU collectives and the official CLI's separate optional Bash sandbox have their own requirements.
 
 ## Automated and package coverage
 

@@ -12,6 +12,25 @@ import { gpuDevices, namespaceArgs } from '../src/isolation.js';
 
 const cli = new URL('../src/cli.js', import.meta.url).pathname;
 
+test('GPU discovery mounts real NVIDIA UVM names on hosts without NVIDIA hardware', () => {
+  const names = ['dxg', 'kfd', 'nvidia0', 'nvidia7', 'nvidiactl', 'nvidia-uvm',
+    'nvidia-uvm-tools', 'nvidia-modeset', 'dri/card0', 'dri/renderD128', 'nvidia-caps/nvidia-cap1'];
+  const excluded = ['nvidiauvm', 'nvidiauvm-tools', 'nvidiamodeset', 'nvidia-ctl', 'nvidia0-extra', 'unrelated'];
+  const paths = names.map(name => `/dev/${name}`).sort();
+  // Real character-device aliases in a private /dev make this independent of CI hardware.
+  const probe = spawnSync('bwrap', ['--unshare-user', '--unshare-net', '--bind', '/', '/',
+    '--dev', '/dev', '--dir', '/dev/dri', '--dir', '/dev/nvidia-caps',
+    ...[...names, ...excluded].flatMap(name => ['--dev-bind', '/dev/null', `/dev/${name}`]),
+    '--die-with-parent', '--', process.execPath, '--input-type=module', '-e', `
+      import { gpuDevices, namespaceArgs } from ${JSON.stringify(new URL('../src/isolation.js', import.meta.url).href)};
+      const args = namespaceArgs(['/bin/true']);
+      const mounts = args.flatMap((arg, i) => arg === '--dev-bind' ? [args.slice(i + 1, i + 3)] : []);
+      console.log(JSON.stringify({ devices: gpuDevices(), mounts }));
+    `], { encoding: 'utf8', timeout: 10_000 });
+  assert.equal(probe.status, 0, probe.stderr);
+  assert.deepEqual(JSON.parse(probe.stdout), { devices: paths, mounts: paths.map(path => [path, path]) });
+});
+
 test('GPU mounts preserve host device identity inside the isolated namespace', async () => {
   const devices = gpuDevices();
   const expected = await Promise.all(devices.map(async path => ({ path, rdev: (await stat(path)).rdev, character: true })));
@@ -29,7 +48,9 @@ test('GPU discovery excludes ordinary files, symlinks and symlinked device direc
   const root = await mkdtemp(join(tmpdir(), 'tether-gpu-test-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   await writeFile(join(root, 'dxg'), 'not a device');
+  await writeFile(join(root, 'nvidia-uvm'), 'not a device');
   await symlink('/dev/null', join(root, 'nvidia0'));
+  await symlink('/dev/null', join(root, 'nvidia-uvm-tools'));
   await symlink('/dev', join(root, 'dri'));
   await mkdir(join(root, 'nvidia-caps'));
   await symlink('/dev/zero', join(root, 'nvidia-caps/nvidia-cap1'));

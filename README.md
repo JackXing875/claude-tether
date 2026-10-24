@@ -6,7 +6,7 @@ Tether is a lightweight launcher for the official Claude Code CLI. It connects t
 
 The official **VS Code native panel** can use the same transport through `tether-vscode`; see the [extension setup](docs/VSCODE.md). Linux/WSL GPU compute remains available inside network isolation.
 
-**Beta: `v0.3.0-beta.4`** · [Release notes](docs/releases/v0.3.0-beta.4.md) · [Operations guide](docs/RUNBOOK.md) · [Contributing](CONTRIBUTING.md)
+**Beta: `v0.3.0-beta.5`** · [Release notes](docs/releases/v0.3.0-beta.5.md) · [Operations guide](docs/RUNBOOK.md) · [Contributing](CONTRIBUTING.md)
 
 ## Quick start
 
@@ -22,7 +22,7 @@ If `claude --version` and key-based `ssh my-vps` already work, no additional ser
 **1. Install the beta**
 
 ```bash
-npm install --global https://github.com/JackXing875/claude-tether/releases/download/v0.3.0-beta.4/claude-tether-0.3.0-beta.4.tgz
+npm install --global https://github.com/JackXing875/claude-tether/releases/download/v0.3.0-beta.5/claude-tether-0.3.0-beta.5.tgz
 ```
 
 The release contains compiled JavaScript and source code. End users do not need TypeScript, Git, a database, or a build step. Beta packages are distributed through GitHub Releases; this command does not rely on an npm registry publication.

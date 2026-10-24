@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0-beta.5 — 2026-10-24
+
+- Fix native Linux NVIDIA CUDA access in isolated CLI and VS Code sessions: match the actual hyphenated `nvidia-uvm`, `nvidia-uvm-tools` and `nvidia-modeset` device names.
+- Inspect device inodes with `lstat` so existing bind-mounted character devices are recognized; continue excluding symlinks, ordinary files and unrelated devices.
+- Add hardware-independent regression coverage for NVIDIA/WSL/AMD/DRM device names and mount arguments, and record native NVIDIA driver/PyTorch discovery before and after the fix. External IP routes remain blocked.
+- Require a new Tether session after upgrading; existing namespaces and running jobs are not restarted or modified.
+
 ## 0.3.0-beta.4 — 2026-10-24
 
 - Add `tether update` and `tether update --check` using published GitHub release assets, with numeric beta ordering, stable-channel preservation and no automatic downgrades.

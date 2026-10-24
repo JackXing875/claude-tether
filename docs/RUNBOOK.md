@@ -114,7 +114,7 @@ For the official VS Code native panel, use the dedicated [`tether-vscode` adapte
 | Proxy `502` | A tunnel or destination connection could not be established; inspect SSH and VPS outbound access |
 | Network isolation unavailable | Install bubblewrap 0.9+ and check the distribution user-namespace policy; see NETWORK.md |
 | A tool reports network unreachable or cannot reach host localhost | Check isolated-mode compatibility; do not assume a VPS outage |
-| GPU works in an ordinary terminal but is hidden in Tether | Upgrade to 0.3.0-beta.3 or later, start a new session and use the same Python environment; see NETWORK.md |
+| GPU works in an ordinary terminal but is hidden in Tether; or `nvidia-smi` works but CUDA reports error 999 | Upgrade to 0.3.0-beta.5 or later, start a new session and compare `/dev/nvidia-uvm` and the same Python environment with the host; see NETWORK.md |
 | ccproxy connection refused/prohibited | Check the gateway loopback listener and SSH key forwarding restrictions |
 | Model output is interrupted | Use Claude's own retry/session recovery; Tether cannot resume a broken TCP stream |
 | Invalid settings | Inspect the named local preferences file; it accepts `ssh`, `sshConfig`, `claude`, `network` (isolated/proxy) and `ccproxyPort` strings |

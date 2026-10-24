@@ -15,14 +15,17 @@ export function networkMode(value: string): NetworkMode {
 export function gpuDevices(root = '/dev'): string[] {
   const devices: string[] = [];
   for (const [directory, pattern] of [
-    [root, /^(dxg|kfd|nvidia(?:\d+|ctl|uvm|uvm-tools|modeset))$/],
+    [root, /^(dxg|kfd|nvidia(?:\d+|ctl|-uvm|-uvm-tools|-modeset))$/],
     [join(root, 'dri'), /^(card\d+|renderD\d+)$/],
     [join(root, 'nvidia-caps'), /^nvidia-cap\d+$/],
   ] as const) {
     try {
       if (!lstatSync(directory).isDirectory()) continue;
-      for (const entry of readdirSync(directory, { withFileTypes: true })) {
-        if (pattern.test(entry.name) && entry.isCharacterDevice()) devices.push(join(directory, entry.name));
+      for (const name of readdirSync(directory)) {
+        const path = join(directory, name);
+        // A bind-mounted device can have a regular-file directory entry. Inspect
+        // the mounted inode without following symlinks instead of trusting d_type.
+        if (pattern.test(name) && lstatSync(path).isCharacterDevice()) devices.push(path);
       }
     } catch (error) {
       if (!['ENOENT', 'EACCES'].includes((error as NodeJS.ErrnoException).code ?? '')) throw error;
