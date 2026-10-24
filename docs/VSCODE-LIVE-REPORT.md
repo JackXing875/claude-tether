@@ -18,7 +18,9 @@ Passed:
 - The generated output file contained the expected marker; the diagnostics fixture was called once.
 - Tether reported isolated networking, and the Python tool's direct connection to an external IP failed with `ENETUNREACH`.
 
-The diagnostics server was a controlled SDK fixture, **not a running VS Code Problems panel**. These tests validate real Claude, SDK callbacks and wrapper transport, not clicks, rendered diffs, editor selection, or every desktop extension action. Interactive panel acceptance remains a separate check after reloading VS Code. See [setup and boundaries](VSCODE.md).
+The diagnostics server was a controlled SDK fixture, **not a running VS Code Problems panel**. These tests validate real Claude, SDK callbacks and wrapper transport, not clicks, rendered diffs, editor selection, or every desktop extension action.
+
+After installing the published beta.3 artifact and configuring Remote WSL, the user reloaded VS Code and confirmed that a new conversation in the official native panel replied normally. This is user-reported acceptance of basic panel chat. Rendered diffs, editor selection, notebook integration and other desktop interactions were not independently verified. See [setup and boundaries](VSCODE.md).
 
 ## GPU access
 
