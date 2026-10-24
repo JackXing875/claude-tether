@@ -13,9 +13,13 @@ On systems restricting user namespaces, ask the system administrator to allow th
 
 ## GPU access
 
-Isolated mode keeps the host filesystem and local compute available. Starting with 0.3.0-beta.3, it mounts existing GPU character devices into the otherwise minimal `/dev`: WSL `/dev/dxg`, NVIDIA numbered/control/UVM/modeset and capability devices, DRM card/render nodes, and AMD `/dev/kfd`. Symlinks and unrelated devices are excluded. This does not mount the entire host `/dev`, grant extra host permissions, or restore Windows interop or external IP routes.
+Isolated mode keeps the host filesystem and local compute available. It mounts existing GPU character devices into the otherwise minimal `/dev`: WSL `/dev/dxg`, NVIDIA numbered/control/UVM/modeset and capability devices, DRM card/render nodes, and AMD `/dev/kfd`. Symlinks and unrelated devices are excluded. Bind-mounted devices are checked by inode type, not just directory-entry type. This does not mount the entire host `/dev`, grant extra host permissions, or restore Windows interop or external IP routes.
 
-Earlier versions hid those devices, so `nvidia-smi` and CUDA could report that GPU access was blocked even when they worked in an ordinary terminal. Upgrade and start a new Tether session. Test the same Python environment both outside and inside Tether: a CPU-only PyTorch build, missing driver or host device permission cannot be fixed by a network launcher. WSL NVIDIA detection and a PyTorch CUDA matrix multiplication were verified; native Linux NVIDIA/AMD hardware still needs separate validation.
+WSL GPU access was restored in beta.3. **Native Linux NVIDIA users need beta.5 or later**: beta.3/beta.4 matched the UVM and modeset names without their hyphens, omitting `/dev/nvidia-uvm`, `/dev/nvidia-uvm-tools` and `/dev/nvidia-modeset`. `nvidia-smi` could still work while CUDA initialization failed with error 999 (`CUDA unknown error`).
+
+Run `tether update`, then start a new Tether CLI/panel session. Device mounts are fixed at startup; updating the package cannot change an already-running namespace. Devices must also exist on the host when the new session starts. Test the same Python environment outside and inside Tether: a CPU-only PyTorch build, missing host driver/device or device permission cannot be fixed by a network launcher.
+
+WSL detection and PyTorch CUDA matrix multiplication were verified in the [SDK/GPU report](VSCODE-LIVE-REPORT.md). Native Linux NVIDIA driver initialization and PyTorch CUDA discovery were verified separately in the [native GPU report](GPU-LIVE-REPORT.md); that test did not allocate GPU tensors or run kernels alongside existing workloads. AMD/ROCm and native DRM compute remain unverified.
 
 This is network isolation, not a promise to hide the host hardware or operating system from Claude. Claude's own optional Bash sandbox is another layer and can impose additional restrictions; do not disable Tether's networking to solve a device or Python-environment issue.
 

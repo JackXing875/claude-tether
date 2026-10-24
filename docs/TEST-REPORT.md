@@ -1,10 +1,10 @@
 # Beta validation record
 
-Target: `0.3.0-beta.4`. Recorded on 2026-10-24 (Asia/Shanghai).
+Target: `0.3.0-beta.5`. Recorded on 2026-10-24 (Asia/Shanghai).
 
 Validation uses Linux x64, Node.js 24.14.0, TypeScript 7.0.2 and OpenSSH 10.0p2. Tests create temporary loopback sshd and TLS services with isolated keys and bubblewrap namespaces; they do not access personal SSH configuration, a real VPS or a Claude account.
 
-Current local results: **45 tests passed, 0 failed, 0 cancelled, 0 skipped**, including the TypeScript build. The actual packed tarball installed, self-updated and ran successfully without access to the checkout's TypeScript toolchain. The production dependency audit reported **0 vulnerabilities**. Documentation links and package/lockfile version and license consistency were also checked.
+Current local results: **46 tests passed, 0 failed, 0 cancelled, 0 skipped**, including the TypeScript build. The actual packed tarball installed, self-updated and ran successfully without access to the checkout's TypeScript toolchain. The production dependency audit reported **0 vulnerabilities**. Documentation links and package/lockfile version and license consistency were also checked.
 
 ## Automated coverage
 
@@ -12,7 +12,7 @@ Current local results: **45 tests passed, 0 failed, 0 cancelled, 0 skipped**, in
 - Real staged npm upgrades in a temporary custom prefix: retained executable links and profile, old-package backup, running-process continuity, disabled lifecycle scripts, engine/metadata/probe failures, concurrency, cancellation and activation rollback.
 - Verified HTTPS download fixture: redirects, rejection of HTTP downgrades and self-signed certificates, bounded/truncated responses, rate limits, aborts and no direct fallback when a host proxy fails.
 - VS Code wrapper: extension-supplied executable, duplex stdin/stdout, EOF, literal SDK arguments, profile/cwd preservation, cancellation, detached-child cleanup and exit status.
-- GPU character-device identity inside isolation; exclusion of ordinary files, symlinks and symlinked device directories. Real WSL CUDA compute is recorded separately in the [SDK/GPU report](VSCODE-LIVE-REPORT.md).
+- GPU character-device identity inside isolation; hardware-independent fixtures for hyphenated NVIDIA UVM/modeset names, existing bind-mounted devices, WSL/AMD/DRM names and mount arguments; exclusion of ordinary files, symlinks, symlinked device directories and unrelated device names. Real WSL CUDA compute is recorded in the [SDK/GPU report](VSCODE-LIVE-REPORT.md); native NVIDIA initialization/discovery in the [native GPU report](GPU-LIVE-REPORT.md).
 - Rootless network isolation: HTTP through real SSH, blocked direct IPv4/IPv6/UDP/DNS/host loopback, shared namespace for child tools, and no fallback when isolation is unavailable.
 - Private Unix bridge response draining and large-upload backpressure; cancellation during connection establishment.
 - Isolated gateway preserves model/tool payloads, beta/auth headers, streamed responses and 429/Retry-After without replay.
