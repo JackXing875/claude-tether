@@ -1,0 +1,35 @@
+{
+  "version": "0.3.0-beta.6",
+  "releaseUrl": "https://github.com/JackXing875/claude-tether/releases/tag/v0.3.0-beta.6",
+  "publishedAt": "2026-10-25T15:09:30Z",
+  "prerelease": true,
+  "tagCommit": "01e3a83a4fb19807440a30f89526c17e61946257",
+  "archiveSha256": "62d74c2af79e8981bd94d4d8867a6a2e4d6819d9a8a658f76b88c6f6b040eee7",
+  "assetDigestMatched": true,
+  "runtimeFilesMatched": 23,
+  "releaseNotesMatched": true,
+  "publishedPackageInstalled": true,
+  "hostSupervisorAvailable": true,
+  "publishedUpdaterCheckPassed": true,
+  "realModelRequestsDuringPublicationCheck": false,
+  "publicationTimeAsiaShanghai": "2026-10-25 23:09:30 +08:00",
+  "pullRequest": "https://github.com/JackXing875/claude-tether/pull/8",
+  "workflows": [
+    {
+      "url": "https://github.com/JackXing875/claude-tether/actions/runs/40205431529",
+      "conclusion": "success"
+    },
+    {
+      "url": "https://github.com/JackXing875/claude-tether/actions/runs/40205434667",
+      "conclusion": "success"
+    },
+    {
+      "url": "https://github.com/JackXing875/claude-tether/actions/runs/40205534933",
+      "conclusion": "success"
+    },
+    {
+      "url": "https://github.com/JackXing875/claude-tether/actions/runs/40205535008",
+      "conclusion": "success"
+    }
+  ]
+}

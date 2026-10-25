@@ -1,6 +1,6 @@
 # 开发日志
 
-最新进展：beta.6 候选已通过本机 WSL 和原生 Linux 的真实 Claude 验收；结果及剩余范围见本页阶段 2 和[真实测试报告](PROCESS-MODE-LIVE-REPORT.md)。阶段 1 保留当时的计划与状态。
+最新进展：beta.6 已完成真实 Claude 验收、GitHub 发布和公开安装包验证；发布结果见阶段 3，功能结果及剩余范围见阶段 2 和[真实测试报告](PROCESS-MODE-LIVE-REPORT.md)。阶段 1 保留当时的计划与状态。
 
 ## 2026-10-25 阶段 1：可靠性修复、独立进程模式与发布前验收
 
@@ -72,3 +72,11 @@
 完整宿主 inotify 扫描在两台机器均报告部分记录不可读，已如实保留 `incomplete` 标记；已验证的是已知 watcher 的可见性，不把它宣称为完整唯一 watch 总数。
 
 发布范围：下一版 beta，包含已完成的 P1/P2 和进程模式改动，P3 继续暂缓。官方 VS Code 二进制及 SDK 通道已测，实际面板点击、历史选择器和渲染交互未重新测试。未做真实账号断网、网络黑洞、休眠或强杀生成中的会话。长时间运行、完整故障恢复及正式版资格仍需分别评估。发布资产与流水线状态以 [GitHub beta.6 Release](https://github.com/JackXing875/claude-tether/releases/tag/v0.3.0-beta.6) 为准。
+
+## 2026-10-25 阶段 3：发布完成与公开资产验收
+
+北京时间 **23:09:30**，GitHub 发布了 [v0.3.0-beta.6](https://github.com/JackXing875/claude-tether/releases/tag/v0.3.0-beta.6)。[PR #8](https://github.com/JackXing875/claude-tether/pull/8) 的分支及 PR 检查通过后合并；[发布流水线](https://github.com/JackXing875/claude-tether/actions/runs/40205535008)和[主分支 CI](https://github.com/JackXing875/claude-tether/actions/runs/40205534933)也均通过。标签对应提交 `01e3a83a4fb19807440a30f89526c17e61946257`，没有修改或复用旧版本标签。
+
+从公开 Release 下载 tarball 与 `SHA256SUMS`，确认 SHA-256 为 `62d74c2af79e8981bd94d4d8867a6a2e4d6819d9a8a658f76b88c6f6b040eee7`，同时匹配 GitHub 资产 digest。23 个运行时文件与真实模型测试过的候选逐字节一致，发布说明和包内报告内容也一致。
+
+在临时 npm prefix 中安装公开 tarball，版本与新增命令帮助正确，默认宿主进程模式的 Python/bubblewrap 检查通过，实际 GitHub `update --check` 成功。此次资产验证没有额外模型请求，也没有替换两台机器的日常安装。[发布验收凭据](evidence/beta6-publication-2026-10-25.json)记录上述结果；当前用户可通过 `tether update` 升级，再新开会话使用。
