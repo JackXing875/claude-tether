@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.0-beta.6 — 2026-10-25
+
+- Separate process visibility from network isolation with `--processes host|isolated`, persisted by setup. Default to host PIDs while retaining isolated networking, user/mount restrictions and GPU device access; explicit isolated PIDs retain the former behavior.
+- Add a Python 3.9+ standard-library subreaper for host-mode cleanup on normal exit, SIGTERM and launcher death. Reap this invocation's detached/double-forked tools without killing unrelated host jobs. No silent fallback when supervision is unavailable.
+- Add `tether doctor --inotify [--json]`: a fixed read-only host operation for current-user watch records, kernel limits and incomplete-read counts. It works through private IPC in host process mode without opening arbitrary host execution or relaxing procfs permissions.
+- Cover both process modes' IP restrictions, process visibility, saved preferences, diagnostic permissions, cleanup and packaged supervisor availability. Document the remaining user-namespace permissions and supervisor lifecycle limits.
+- Contain malformed ordinary HTTP responses within the affected request: validate final status codes and catch response callback failures, returning 502 without terminating the launcher or isolated Claude process.
+- Preserve streaming request framing for GET, DELETE and other methods, including explicit content lengths and chunked uploads.
+- Preserve TCP write-half-closes during bridge and CONNECT establishment, drain pending uploads before forwarding EOF, and keep the response direction open. Connection resets still cancel pending dials.
+- Reject unsupported ordinary HTTP upgrades with 501 and unsolicited upstream 101 responses with 502; close the associated sockets. HTTPS upgrades carried inside CONNECT remain transparent.
+- Bind the private IPC directories after the isolated `/dev` and `/run` mounts so custom `TMPDIR` locations keep working without exposing sibling host files.
+- Read the installed version after acquiring the update lock, and recheck immediately before activation. Delayed updaters skip completed upgrades and stale release lists; detected external version changes stop activation.
+- Add transport, isolated-launcher and independent-process update regression tests. Release workflow idempotency/concurrency and extended real-network recovery acceptance remain pending.
+- Pass 75 automated tests, packed installation/self-update and production dependency audit. Verify the packaged candidate with real Pro/Claude Code 2.1.310 on WSL and native Linux: native tools, SDK permission callbacks, host watch/GPU discovery, Sonnet-to-Opus switching, CLI resume and normal descendant cleanup. Record real SDK coverage separately from untested desktop panel interactions.
+
 ## 0.3.0-beta.5 — 2026-10-24
 
 - Fix native Linux NVIDIA CUDA access in isolated CLI and VS Code sessions: match the actual hyphenated `nvidia-uvm`, `nvidia-uvm-tools` and `nvidia-modeset` device names.

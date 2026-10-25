@@ -11,11 +11,23 @@ import { SshTunnel } from './tunnel.js';
 import { readSettings, saveSettings, settingsPath } from './settings.js';
 import { proxyEnvironment } from './environment.js';
 import { localSocket, startBridge } from './bridge.js';
-import { checkIsolation, isolatedCommand, namespaceArgs, networkMode } from './isolation.js';
+import { checkIsolation, isolatedCommand, namespaceArgs, networkMode, processMode } from './isolation.js';
+import { formatInotify, inotifyDiagnostic, startHostDiagnostics } from './diagnostics.js';
 import { update } from './update.js';
 export { proxyEnvironment } from './environment.js';
 
 export async function main(argv: string[]): Promise<number> {
+  if (argv[0] === 'doctor' && argv.includes('--inotify')) {
+    const { values } = parseArgs({ args: argv.slice(1), options: {
+      inotify: { type: 'boolean' }, json: { type: 'boolean' }, help: { type: 'boolean', short: 'h' },
+    } });
+    if (values.help) console.log('Usage: tether doctor --inotify [--json]\nRead current-user host inotify statistics. No SSH connection or Claude login is required.');
+    else {
+      const report = await inotifyDiagnostic();
+      console.log(values.json ? JSON.stringify(report) : formatInotify(report));
+    }
+    return 0;
+  }
   if (argv[0] === 'update') {
     const { values } = parseArgs({ args: argv.slice(1), options: {
       check: { type: 'boolean' }, help: { type: 'boolean', short: 'h' },
@@ -29,7 +41,7 @@ export async function main(argv: string[]): Promise<number> {
   const command = ['setup', 'doctor'].includes(ownArgs[0] ?? '') ? ownArgs.shift()! : 'run';
   const { values, positionals } = parseArgs({ args: ownArgs, allowPositionals: command === 'setup', options: {
     ssh: { type: 'string' }, 'ssh-config': { type: 'string' },
-    network: { type: 'string' }, 'ccproxy-port': { type: 'string' },
+    network: { type: 'string' }, processes: { type: 'string' }, 'ccproxy-port': { type: 'string' },
     'no-ccproxy': { type: 'boolean' },
     claude: { type: 'string' }, help: { type: 'boolean', short: 'h' }, version: { type: 'boolean', short: 'v' },
   } });
@@ -37,6 +49,7 @@ export async function main(argv: string[]): Promise<number> {
     console.log(`Usage: tether [options] -- [Claude arguments]
        tether setup [SSH alias|user@host] [options]
        tether doctor [options]
+       tether doctor --inotify [--json]
        tether update [--check]
 
 Runs official Claude Code locally through an automatically reconnected SSH tunnel.
@@ -51,6 +64,7 @@ Options:
   --ssh-config <file>  Use a specific OpenSSH configuration file
   --claude <path>      Use a specific official Claude executable
   --network <mode>     isolated (default, Linux/WSL) or proxy (compatibility)
+  --processes <mode>   host (default) or isolated (private PID namespace)
   --ccproxy-port <n>   Use ccproxy on VPS loopback via SSH (experimental)
   --no-ccproxy         Disable a saved ccproxy gateway for this invocation
   -h, --help          Show this help
@@ -59,6 +73,8 @@ Options:
 Setup checks local Claude and SSH before saving preferences; no credentials are saved.
 Doctor checks the executable and SSH tunnel without sending a model request.
 Isolated mode requires bubblewrap >= 0.9; proxy overrides cannot restore direct IP egress.
+Host process mode requires Python >= 3.9 for descendant cleanup. Linux process permissions still apply.
+Use doctor --inotify for read-only host watch counts; --processes isolated hides host processes.
 Proxy-unaware tools are blocked in isolated mode. This is not a system-wide VPN.
 First verify the host key and key/agent login with ssh. VPS requires only OpenSSH.`);
     return 0;
@@ -80,14 +96,16 @@ First verify the host key and key/agent login with ssh. VPS requires only OpenSS
   const sshConfig = values['ssh-config'] ?? saved.sshConfig;
   const executable = values.claude ?? saved.claude ?? 'claude';
   const network = networkMode(values.network ?? saved.network ?? 'isolated');
+  const processes = processMode(values.processes ?? saved.processes ?? 'host');
+  if (network === 'proxy' && processes === 'isolated') throw new Error('--processes isolated requires --network isolated.');
   if (values['ccproxy-port'] && values['no-ccproxy']) throw new Error('Choose --ccproxy-port or --no-ccproxy, not both');
   const ccproxyPort = values['no-ccproxy'] ? undefined : values['ccproxy-port'] ?? saved.ccproxyPort;
   if (ccproxyPort !== undefined && (!/^\d{1,5}$/.test(ccproxyPort) || Number(ccproxyPort) < 1 || Number(ccproxyPort) > 65535)) {
     throw new Error('--ccproxy-port must be a port between 1 and 65535 on VPS 127.0.0.1');
   }
-  if (network === 'isolated') checkIsolation();
+  if (network === 'isolated') checkIsolation(processes);
   const available = network === 'isolated'
-    ? spawnSync('bwrap', namespaceArgs([executable, '--version']), { stdio: 'ignore', timeout: 10_000 })
+    ? spawnSync('bwrap', namespaceArgs([executable, '--version'], [], processes), { stdio: 'ignore', timeout: 10_000 })
     : spawnSync(executable, ['--version'], { stdio: 'ignore', timeout: 10_000 });
   if (available.status !== 0) throw new Error('Local Claude Code is unavailable. Install the official CLI or use --claude /path/to/claude.');
   const args = separator < 0 ? [] : argv.slice(separator + 1);
@@ -100,7 +118,10 @@ First verify the host key and key/agent login with ssh. VPS requires only OpenSS
     if (signal === 'SIGINT' && claude && process.stdin.isTTY) return;
     stopSignal = signal;
     claude?.kill(signal);
-    if (claude && !killTimer) {
+    // The host-mode subreaper escalates and reaps its own descendants. Killing
+    // that supervisor early would strand detached tools. Other modes use the
+    // existing PID-namespace/direct-child escalation.
+    if (claude && !killTimer && !(network === 'isolated' && processes === 'host')) {
       killTimer = setTimeout(() => claude?.kill('SIGKILL'), 2_000);
       killTimer.unref();
     }
@@ -109,6 +130,7 @@ First verify the host key and key/agent login with ssh. VPS requires only OpenSS
   const signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM', 'SIGHUP'];
   for (const signal of signals) process.on(signal, stop);
   let proxy: Awaited<ReturnType<typeof startProxy>> | undefined;
+  let diagnostics: Awaited<ReturnType<typeof startHostDiagnostics>> | undefined;
   const bridges: Awaited<ReturnType<typeof startBridge>>[] = [];
   let directory: string | undefined;
   try {
@@ -122,16 +144,19 @@ First verify the host key and key/agent login with ssh. VPS requires only OpenSS
       if (command === 'setup') {
         await saveSettings({ ssh: destination, ...(sshConfig ? { sshConfig: resolve(sshConfig) } : {}),
           claude: /[/\\]/.test(executable) ? resolve(executable) : executable,
-          network, ...(ccproxyPort ? { ccproxyPort } : {}) });
+          network, processes, ...(ccproxyPort ? { ccproxyPort } : {}) });
         console.log(`Saved preferences to ${settingsPath()}.\nReady. Run tether from your project directory.`);
-      } else console.log(`Local Claude executable and SSH tunnel are ready (network: ${network}${ccproxyPort ? ', ccproxy TCP reachable; authentication not tested' : ''}). No model request was made.`);
+      } else console.log(`Local Claude executable and SSH tunnel are ready (network: ${network}, processes: ${processes}${ccproxyPort ? ', ccproxy TCP reachable; authentication not tested' : ''}). No model request was made.`);
       return 0;
     }
     proxy = await startProxy((host, port, signal) => tunnel.connect(host, port, signal));
     const env = proxyEnvironment(process.env, proxy.url);
+    env.TETHER_NETWORK_MODE = network;
+    env.TETHER_PROCESS_MODE = processes;
+    delete env.TETHER_HOST_SOCKET;
     let launch = { executable, args };
     if (network === 'isolated') {
-      directory = await mkdtemp(join(tmpdir(), 'tether-network-'));
+      directory = await mkdtemp(join(resolve(tmpdir()), 'tether-network-'));
       const proxySocket = join(directory, 'proxy.sock');
       bridges.push(await startBridge(signal => localSocket(Number(new URL(proxy!.url).port), signal), proxySocket));
       let gatewaySocket: string | undefined;
@@ -139,14 +164,18 @@ First verify the host key and key/agent login with ssh. VPS requires only OpenSS
         gatewaySocket = join(directory, 'gateway.sock');
         bridges.push(await startBridge(signal => tunnel.connect('127.0.0.1', Number(ccproxyPort), signal), gatewaySocket));
       }
-      launch = isolatedCommand(executable, args, proxySocket, gatewaySocket);
+      if (processes === 'host') {
+        env.TETHER_HOST_SOCKET = join(directory, 'host.sock');
+        diagnostics = await startHostDiagnostics(env.TETHER_HOST_SOCKET);
+      }
+      launch = isolatedCommand(executable, args, proxySocket, gatewaySocket, processes);
     } else if (ccproxyPort) {
       const gateway = await startBridge(signal => tunnel.connect('127.0.0.1', Number(ccproxyPort), signal));
       bridges.push(gateway);
       env.ANTHROPIC_BASE_URL = `http://127.0.0.1:${gateway.port}`;
     }
     if (stopSignal) return 128 + constants.signals[stopSignal];
-    console.error(`[tether] Network: ${network}${ccproxyPort ? '; experimental ccproxy via VPS loopback' : ''}.`);
+    console.error(`[tether] Network: ${network}; processes: ${processes}${ccproxyPort ? '; experimental ccproxy via VPS loopback' : ''}.`);
     claude = spawn(launch.executable, launch.args, { stdio: 'inherit', env, shell: false });
     return await new Promise<number>((resolve, reject) => {
       claude!.once('error', error => reject(new Error(`Cannot start local Claude Code (${(error as NodeJS.ErrnoException).code ?? 'spawn error'}). Install the official CLI or use --claude.`)));
@@ -162,6 +191,7 @@ First verify the host key and key/agent login with ssh. VPS requires only OpenSS
     if (killTimer) clearTimeout(killTimer);
     for (const signal of signals) process.off(signal, stop);
     try {
+      await diagnostics?.close();
       for (const bridge of bridges) await bridge.close();
       await proxy?.close();
     } finally {

@@ -105,7 +105,7 @@ test('one-time setup enables plain launch and doctor without modifying saved pre
   assert.match(setup.stdout, /Run tether from your project directory/);
   const path = join(fixture.directory, 'claude-tether', 'config.json');
   const saved = await readFile(path, 'utf8');
-  assert.deepEqual(JSON.parse(saved), { ssh: 'test-vps', sshConfig: fixture.config, claude: process.execPath, network: 'isolated' });
+  assert.deepEqual(JSON.parse(saved), { ssh: 'test-vps', sshConfig: fixture.config, claude: process.execPath, network: 'isolated', processes: 'host' });
   assert.equal((await stat(path)).mode & 0o777, 0o600);
   const fake = join(fixture.directory, 'saved-default.mjs');
   await writeFile(fake, 'console.log("saved-default-launched");');
@@ -115,10 +115,30 @@ test('one-time setup enables plain launch and doctor without modifying saved pre
   const doctor = await invoke(['doctor']);
   assert.equal(doctor.code, 0, doctor.stderr);
   assert.match(doctor.stdout, /No model request was made/);
+  assert.match(doctor.stdout, /processes: host/);
+  const strict = await invoke(['doctor', '--processes', 'isolated']);
+  assert.equal(strict.code, 0, strict.stderr); assert.match(strict.stdout, /processes: isolated/);
   const override = await invoke(['--ssh', 'other-vps', '--claude', '/not-a-claude-executable']);
   assert.equal(override.code, 1);
   assert.match(override.stderr, /Local Claude Code is unavailable/);
   const failedSetup = await invoke(['setup', 'replacement-vps', '--claude', '/not-a-claude-executable']);
   assert.equal(failedSetup.code, 1);
   assert.equal(await readFile(path, 'utf8'), saved, 'failed setup/one-off options must not overwrite working preferences');
+  const savedStrict = await invoke(['setup', '--processes', 'isolated']);
+  assert.equal(savedStrict.code, 0, savedStrict.stderr);
+  assert.equal(JSON.parse(await readFile(path, 'utf8')).processes, 'isolated');
+  const strictDefault = await invoke(['doctor']);
+  assert.equal(strictDefault.code, 0, strictDefault.stderr); assert.match(strictDefault.stdout, /processes: isolated/);
+  const hostOverride = await invoke(['doctor', '--processes', 'host']);
+  assert.equal(hostOverride.code, 0, hostOverride.stderr); assert.match(hostOverride.stdout, /processes: host/);
+  assert.equal(JSON.parse(await readFile(path, 'utf8')).processes, 'isolated');
+});
+
+test('invalid process modes and unsupported network combinations fail before SSH starts', async () => {
+  for (const args of [['--processes', 'auto'], ['--network', 'proxy', '--processes', 'isolated']]) {
+    const child = spawn(process.execPath, [cli, '--ssh', 'not-contacted', ...args], { env: { ...process.env, XDG_CONFIG_HOME: '/missing-settings' } });
+    let stderr = ''; child.stderr.on('data', data => { stderr += data; });
+    assert.equal((await once(child, 'close'))[0], 1);
+    assert.match(stderr, /--processes/); assert.doesNotMatch(stderr, /SSH/);
+  }
 });

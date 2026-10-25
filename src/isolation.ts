@@ -1,12 +1,19 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, lstatSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export type NetworkMode = 'isolated' | 'proxy';
+export type ProcessMode = 'host' | 'isolated';
+const supervisor = fileURLToPath(new URL('../../src/process-supervisor.py', import.meta.url));
 
 export function networkMode(value: string): NetworkMode {
   if (value !== 'isolated' && value !== 'proxy') throw new Error('--network must be isolated or proxy');
+  return value;
+}
+
+export function processMode(value: string): ProcessMode {
+  if (value !== 'host' && value !== 'isolated') throw new Error('--processes must be host or isolated');
   return value;
 }
 
@@ -34,25 +41,36 @@ export function gpuDevices(root = '/dev'): string[] {
   return devices.sort();
 }
 
-export function namespaceArgs(command: string[]): string[] {
-  return ['--unshare-user', '--unshare-net', '--unshare-pid', '--unshare-ipc',
+export function namespaceArgs(command: string[], ipcDirectories: string[] = [], processes: ProcessMode = 'host'): string[] {
+  return ['--unshare-user', '--unshare-net', ...(processes === 'isolated' ? ['--unshare-pid'] : []), '--unshare-ipc',
     '--disable-userns', '--cap-drop', 'ALL', '--bind', '/', '/', '--proc', '/proc',
     '--dev', '/dev', ...gpuDevices().flatMap(path => ['--dev-bind', path, path]), '--tmpfs', '/run',
+    // TMPDIR may live below /run or /dev. Re-expose only our private IPC
+    // directories after those parents have been replaced, not their siblings.
+    ...ipcDirectories.flatMap(path => ['--bind', path, path]),
     // WSL interop would otherwise start Windows programs outside this namespace.
     ...(existsSync('/init') ? ['--ro-bind', '/dev/null', '/init'] : []),
     '--unsetenv', 'WSL_INTEROP', '--unsetenv', 'WSLENV', '--unsetenv', 'SSH_AUTH_SOCK',
     '--die-with-parent', '--', ...command];
 }
 
-export function checkIsolation(): void {
+export function checkIsolation(processes: ProcessMode = 'host'): void {
   if (process.platform !== 'linux') throw new Error('Isolated networking requires Linux/WSL and bubblewrap. Use --network proxy explicitly for compatibility mode.');
-  const check = spawnSync('bwrap', namespaceArgs(['/bin/true']), { encoding: 'utf8', timeout: 10_000 });
+  const check = spawnSync('bwrap', namespaceArgs(['/bin/true'], [], processes), { encoding: 'utf8', timeout: 10_000 });
   if (check.status !== 0) {
     throw new Error('Network isolation unavailable: install bubblewrap >= 0.9 and enable user namespaces for bwrap. No direct fallback was used. See docs/NETWORK.md or explicitly select --network proxy.');
   }
+  if (processes === 'host') {
+    const supervision = spawnSync('python3', ['-I', supervisor, '--check'], { encoding: 'utf8', timeout: 10_000 });
+    if (supervision.status !== 0) throw new Error('Host process mode requires Python >= 3.9 with Linux subreaper support. Install python3 or use --processes isolated. No unconfined fallback was used.');
+  }
 }
 
-export function isolatedCommand(executable: string, args: string[], proxySocket: string, gatewaySocket?: string) {
-  return { executable: 'bwrap', args: namespaceArgs([process.execPath,
-    fileURLToPath(new URL('./isolated-child.js', import.meta.url)), proxySocket, gatewaySocket ?? '', executable, ...args]) };
+export function isolatedCommand(executable: string, args: string[], proxySocket: string, gatewaySocket?: string, processes: ProcessMode = 'host') {
+  const directories = [...new Set([proxySocket, ...(gatewaySocket ? [gatewaySocket] : [])].map(dirname))];
+  const bwrap = namespaceArgs([process.execPath,
+    fileURLToPath(new URL('./isolated-child.js', import.meta.url)), proxySocket, gatewaySocket ?? '', executable, ...args], directories, processes);
+  return processes === 'host'
+    ? { executable: 'python3', args: ['-I', supervisor, '--parent', String(process.pid), '--', 'bwrap', ...bwrap] }
+    : { executable: 'bwrap', args: bwrap };
 }

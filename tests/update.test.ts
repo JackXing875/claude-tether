@@ -3,7 +3,7 @@ import { execFile, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { once } from 'node:events';
 import { renameSync } from 'node:fs';
-import { chmod, mkdir, mkdtemp, readFile, readdir, readlink, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, readdir, readlink, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { Agent, createServer } from 'node:https';
 import { createServer as createProxy } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -31,7 +31,7 @@ async function directory(t: TestContext) {
   return path;
 }
 
-async function fixture(t: TestContext, overrides: Record<string, unknown> = {}, entrySource?: string) {
+async function fixture(t: TestContext, overrides: Record<string, unknown> = {}, entrySource?: string, version = next) {
   const path = await directory(t), prefix = join(path, 'prefix'), library = join(prefix, 'lib');
   const root = join(library, 'node_modules', 'claude-tether');
   await mkdir(join(root, 'dist', 'src'), { recursive: true });
@@ -45,22 +45,34 @@ async function fixture(t: TestContext, overrides: Record<string, unknown> = {}, 
   await writeFile(profile, '{"ssh":"fixture-vps","model":"keep-this-preference"}');
   const source = join(path, 'release');
   await mkdir(join(source, 'dist', 'src'), { recursive: true });
-  await writeFile(join(source, 'package.json'), JSON.stringify({ name: 'claude-tether', version: next, type: 'module', bin: bins,
+  await writeFile(join(source, 'package.json'), JSON.stringify({ name: 'claude-tether', version, type: 'module', bin: bins,
     scripts: { postinstall: 'node -e "process.exit(99)"' }, ...overrides }));
   await writeFile(join(source, bins.tether), entrySource ?? script, { mode: 0o755 });
   await writeFile(join(source, bins['tether-vscode']), script, { mode: 0o755 });
   const packed = await run('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', path], { cwd: source });
-  const archive = await readFile(join(path, JSON.parse(packed.stdout)[0].filename));
+  const archivePath = join(path, JSON.parse(packed.stdout)[0].filename);
+  const archive = await readFile(archivePath);
   const hash = createHash('sha256').update(archive).digest('hex');
-  const manifest = Buffer.from(`${hash}  ./claude-tether-${next}.tgz\n`);
-  const listing = [release(next, archive)];
+  const manifest = Buffer.from(`${hash}  ./claude-tether-${version}.tgz\n`);
+  const listing = [release(version, archive)];
   const calls: string[] = [], logs: string[] = [];
   const getBytes = async (url: string) => {
     calls.push(url);
     if (url.includes('/releases?')) return Buffer.from(JSON.stringify(listing));
     return url.endsWith('/SHA256SUMS') ? manifest : archive;
   };
-  return { path, prefix, library, root, profile, archive, manifest, listing, calls, logs, getBytes, options: { root, getBytes, log: (message: string) => logs.push(message) } };
+  return { path, prefix, library, root, profile, archivePath, archive, manifest, listing, calls, logs, getBytes, options: { root, getBytes, log: (message: string) => logs.push(message) } };
+}
+
+function updater(t: TestContext, root: string, version: string, archive: string, pause = false) {
+  const child = spawn(process.execPath, [new URL('./fixtures/update-process.js', import.meta.url).pathname,
+    root, version, archive, pause ? 'pause' : 'run'], { stdio: ['ignore', 'pipe', 'pipe', 'ipc'], timeout: 20_000 });
+  let stdout = '', stderr = '';
+  child.stdout!.on('data', chunk => { stdout += String(chunk); });
+  child.stderr!.on('data', chunk => { stderr += String(chunk); });
+  const finished = once(child, 'close').then(([code]) => ({ code, stdout, stderr }));
+  t.after(async () => { if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL'); await finished; });
+  return { child, ready: pause ? once(child, 'message') : undefined, finished };
 }
 
 test('release selection compares numeric beta versions, skips drafts and keeps stable installs on stable releases', () => {
@@ -183,6 +195,52 @@ test('simultaneous updates cannot replace the same package; interrupted download
   await assert.rejects(first, /Update cancelled/);
   assert.equal((await run(join(f.prefix, 'bin', 'tether'), ['--version'])).stdout.trim(), old);
   assert.deepEqual(await readdir(f.library), ['node_modules']);
+});
+
+for (const target of [next, '0.3.0-beta.9']) {
+  test(`a delayed updater with release ${target} cannot reinstall or downgrade a completed update`, { timeout: 30_000 }, async t => {
+    const f = await fixture(t, {}, undefined, target);
+    const latest = target === next ? f : await fixture(t);
+    const waiting = updater(t, f.root, target, f.archivePath, true);
+    assert.deepEqual((await waiting.ready)![0], { stage: 'before-lock' });
+    const other = await updater(t, f.root, next, latest.archivePath).finished;
+    assert.equal(other.code, 0, other.stderr);
+    const installed = join(f.root, 'package.json');
+    const before = await stat(installed);
+    assert.equal(JSON.parse(await readFile(installed, 'utf8')).version, next);
+
+    waiting.child.send('continue');
+    const result = await waiting.finished;
+    assert.equal(result.code, 0, result.stderr);
+    const report = JSON.parse(result.stdout) as { downloads: string[]; logs: string[] };
+    assert.equal(report.downloads.length, 1, 'an already completed update must not download assets or run npm');
+    assert.match(report.logs.join('\n'), new RegExp(`installed: ${next.replaceAll('.', '\\.')}`));
+    assert.ok(report.logs.some(line => line.includes('up to date')));
+    assert.equal(JSON.parse(await readFile(installed, 'utf8')).version, next);
+    assert.equal((await stat(installed)).ino, before.ino, 'the newer package must not be replaced');
+    const backups = (await readdir(f.library)).filter(name => name.startsWith('.tether-backup-'));
+    assert.equal(backups.length, 1, 'only the updater that actually upgraded should create a backup');
+    assert.equal(JSON.parse(await readFile(join(f.library, backups[0]!, 'claude-tether/package.json'), 'utf8')).version, old);
+    assert.ok(!(await readdir(f.library)).some(name => name.startsWith('.tether-update')));
+  });
+}
+
+test('activation rechecks a version changed by an installer that does not use the update lock', { timeout: 30_000 }, async t => {
+  for (const externalVersion of [next, '0.4.0-beta.1', '0.3.0']) {
+    const f = await fixture(t);
+    const installed = join(f.root, 'package.json');
+    let externalBytes = '';
+    await assert.rejects(update({ ...f.options, getBytes: async url => {
+      if (url.endsWith('.tgz')) {
+        externalBytes = JSON.stringify({ ...JSON.parse(await readFile(installed, 'utf8')), version: externalVersion });
+        await writeFile(installed, externalBytes);
+      }
+      return f.getBytes(url);
+    } }), /installed Tether version changed/);
+    assert.equal(await readFile(installed, 'utf8'), externalBytes);
+    assert.deepEqual(await readdir(f.library), ['node_modules'], 'staging, unused backup and update lock must be cleaned up');
+    assert.ok(!f.logs.some(line => line.startsWith('Updated Tether')));
+  }
 });
 
 test('activation rolls back if the second filesystem rename fails', async t => {

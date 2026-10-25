@@ -33,9 +33,9 @@ cd your-project
 tether
 ```
 
-Setup checks bubblewrap/user namespace support, the local Claude executable inside isolation, and the SSH/SOCKS listener. It saves preferences only after those checks pass, using an atomic replacement and a private file mode. It does not make a model request or prove that the VPS can reach every upstream destination. Existing working preferences survive a failed setup.
+Setup checks bubblewrap/user namespace support, Python 3.9+ supervision in host process mode, the local Claude executable inside isolation, and the SSH/SOCKS listener. It saves preferences only after those checks pass, using an atomic replacement and a private file mode. It does not make a model request or prove that the VPS can reach every upstream destination. Existing working preferences survive a failed setup.
 
-To change the default, run setup again. To override it temporarily, use `--ssh`, `--ssh-config`, `--claude`, `--network`, `--ccproxy-port` or `--no-ccproxy` on a normal launch. A temporary override does not modify saved preferences.
+To change the default, run setup again. To override it temporarily, use `--ssh`, `--ssh-config`, `--claude`, `--network`, `--processes`, `--ccproxy-port` or `--no-ccproxy` on a normal launch. A temporary override does not modify saved preferences.
 
 ```bash
 tether setup my-vps --ssh-config ~/.ssh/tether-config
@@ -58,7 +58,7 @@ tether -- --resume SESSION_ID
 
 The official local CLI manages authentication and refresh. Tether does not export credentials or clear existing API key/provider settings. Confirm your account and authentication method in Claude itself.
 
-A browser opened for authorization does not inherit the CLI's proxy environment. Default isolation disables Windows interop and separates host loopback. Use the official manual URL/code login flow if offered; if a browser callback requires host loopback, explicitly use `tether --network proxy -- auth login` for that login and then return to isolated mode. If the authorization page cannot load, use the browser's supported network configuration. Do not paste authorization codes or tokens into issue reports or Tether settings.
+A browser opened for authorization does not inherit the CLI's proxy environment. Default isolation disables Windows interop and separates host loopback. Use the official manual URL/code login flow if offered; if a browser callback requires host loopback, explicitly use `tether --network proxy --processes host -- auth login` for that login and then return to isolated mode. If the authorization page cannot load, use the browser's supported network configuration. Do not paste authorization codes or tokens into issue reports or Tether settings.
 
 An earlier VPS-based prototype may have left software on the server. That installation is not used by this version; removal is a separate administrative action. Local Claude authentication is independent of any login saved on the VPS.
 
@@ -99,6 +99,8 @@ Default `--network isolated` runs Claude and Linux child tools with loopback as 
 
 For programs requiring host loopback, Windows interop or unsupported protocols, see [network modes and compatibility](NETWORK.md). Explicit `--network proxy` retains the older environment-only mode, where project settings can bypass the proxy. No automatic fallback occurs.
 
+The beta.6 default `--processes host` keeps host jobs visible while retaining network isolation. To save the previous private PID behavior use `tether setup --processes isolated`; to restore the new default use `tether setup --processes host`. New CLI and panel sessions inherit it. An existing session is not migrated. Both modes retain user-namespace permissions, so `/proc/<host-pid>/fdinfo` can still be unreadable. For host watch statistics use `tether doctor --inotify [--json]`; this command needs no SSH or Claude login. From a private PID session run it in an ordinary host terminal. Read [process visibility and cleanup](NETWORK.md#process-visibility-and-cleanup) before using tools that signal existing jobs.
+
 The optional `--ccproxy-port` connects a gateway on VPS loopback over SSH; read its [experimental limitations](CCPROXY.md) before use. It is disabled unless selected and is not required for `/model` or local tools.
 
 ## Troubleshooting
@@ -113,11 +115,13 @@ For the official VS Code native panel, use the dedicated [`tether-vscode` adapte
 | SSH disconnected | Allow the reconnect loop to recover; the local Claude process stays alive |
 | Proxy `502` | A tunnel or destination connection could not be established; inspect SSH and VPS outbound access |
 | Network isolation unavailable | Install bubblewrap 0.9+ and check the distribution user-namespace policy; see NETWORK.md |
+| Host process mode requires Python | Install system Python 3.9+ (`sudo apt-get install python3`) or explicitly select `--processes isolated`; no fallback occurs |
+| Host `ps`/inotify results are missing or zero | Check `processes` mode, do not hide procfs errors; use `tether doctor --inotify` for a host snapshot |
 | A tool reports network unreachable or cannot reach host localhost | Check isolated-mode compatibility; do not assume a VPS outage |
 | GPU works in an ordinary terminal but is hidden in Tether; or `nvidia-smi` works but CUDA reports error 999 | Upgrade to 0.3.0-beta.5 or later, start a new session and compare `/dev/nvidia-uvm` and the same Python environment with the host; see NETWORK.md |
 | ccproxy connection refused/prohibited | Check the gateway loopback listener and SSH key forwarding restrictions |
 | Model output is interrupted | Use Claude's own retry/session recovery; Tether cannot resume a broken TCP stream |
-| Invalid settings | Inspect the named local preferences file; it accepts `ssh`, `sshConfig`, `claude`, `network` (isolated/proxy) and `ccproxyPort` strings |
+| Invalid settings | Inspect the named local preferences file; it accepts `ssh`, `sshConfig`, `claude`, `network` (isolated/proxy), `processes` (host/isolated) and `ccproxyPort` strings |
 
 Tether logs connection state and OpenSSH's diagnostics. It does not log model request bodies or credentials. Redact hostnames, usernames and local paths before sharing diagnostic output.
 
@@ -141,7 +145,7 @@ Self-update supports writable global npm prefixes on Linux/WSL and macOS; macOS 
 
 Update downloads run on the **host network**, separately from Claude's SSH tunnel, and honor the host's `HTTPS_PROXY`/`https_proxy` and `NO_PROXY` settings. A configured proxy failure does not fall back to direct access. GitHub API rate limits or download errors stop the update; retry later. These public requests contain no Claude credentials.
 
-Concurrent updates to one installation are locked. If a process was killed abruptly, the error identifies the lock file; remove it only after verifying no updater is still running. Normal cancellation removes the lock and staging directory. Activation uses two filesystem renames with rollback on errors, not a crash-proof filesystem transaction: after a machine crash during activation, restore the retained `claude-tether` backup directory to its original `lib/node_modules/claude-tether` path, or reinstall the release tarball. Backups are not automatically deleted; after closing old sessions and verifying the upgrade, remove obsolete backup directories if desired.
+Concurrent updates to one installation are locked. The installed version is read after taking the lock, so a delayed updater does not reinstall or downgrade a version installed by another updater. Immediately before activation the version is checked again; if an external installer changed it, the update stops and asks you to retry. External installers should still not run concurrently, because they do not participate in Tether's lock. If a process was killed abruptly, the error identifies the lock file; remove it only after verifying no updater is still running. Normal cancellation removes the lock and staging directory. Activation uses two filesystem renames with rollback on errors, not a crash-proof filesystem transaction: after a machine crash during activation, restore the retained `claude-tether` backup directory to its original `lib/node_modules/claude-tether` path, or reinstall the release tarball. Backups are not automatically deleted; after closing old sessions and verifying the upgrade, remove obsolete backup directories if desired.
 
 For beta.3 or earlier, install beta.4 or later once using the npm command in its release notes. If a personal shell wrapper puts every argument after `--`, route `update` to Tether **before** that separator; otherwise it becomes a Claude argument. Use stable package paths in custom CLI and VS Code wrappers. An `update` intended for Claude can still be passed explicitly as `tether -- update`.
 

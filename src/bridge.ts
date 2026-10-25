@@ -3,8 +3,8 @@ import { createConnection, createServer, type Socket } from 'node:net';
 
 export async function localSocket(address: string | number, signal: AbortSignal): Promise<Socket> {
   const socket = typeof address === 'string'
-    ? createConnection({ path: address, signal })
-    : createConnection({ host: '127.0.0.1', port: address, signal });
+    ? createConnection({ path: address, signal, allowHalfOpen: true })
+    : createConnection({ host: '127.0.0.1', port: address, signal, allowHalfOpen: true });
   socket.on('error', () => {});
   try { await once(socket, 'connect'); return socket; }
   catch (error) { socket.destroy(); throw error; }
@@ -28,14 +28,13 @@ export async function startBridge(dial: (signal: AbortSignal) => Promise<Socket>
       // At most the threshold plus one socket chunk is held by this bridge.
       if (pendingBytes >= 64 * 1024) client.pause();
     };
-    const cancelled = () => client.destroy();
-    client.on('data', collect).once('end', cancelled);
+    client.on('data', collect);
     void (async () => {
       try {
         const upstream = await dial(controller.signal);
         if (client.destroyed) { upstream.destroy(); return; }
         client.pause();
-        client.off('data', collect).off('end', cancelled);
+        client.off('data', collect);
         sockets.add(upstream);
         upstream.on('error', () => client.destroy());
         upstream.once('close', () => {
@@ -44,12 +43,16 @@ export async function startBridge(dial: (signal: AbortSignal) => Promise<Socket>
         });
         client.once('close', () => upstream.destroy());
         for (const socket of [client, upstream]) {
+          socket.allowHalfOpen = true;
           socket.setNoDelay(true);
           socket.setKeepAlive(true, 30_000);
         }
         for (const chunk of pending) upstream.write(chunk);
-        client.pipe(upstream);
         upstream.pipe(client);
+        // A FIN received while dialing only ends the client's write direction.
+        // Flush its buffered bytes and FIN, then keep relaying the response.
+        if (client.readableEnded) upstream.end();
+        else client.pipe(upstream);
       } catch { client.destroy(); }
     })();
   });

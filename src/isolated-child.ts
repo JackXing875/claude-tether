@@ -3,8 +3,8 @@ import { constants } from 'node:os';
 import { localSocket, startBridge } from './bridge.js';
 import { proxyEnvironment } from './environment.js';
 
-// This helper and every Claude descendant run inside the same network/PID
-// namespace. When its PID 1 dies, the kernel kills the remaining descendants.
+// Every descendant shares our network namespace. Host process mode uses an
+// outer subreaper for cleanup; isolated process mode uses a private PID 1.
 async function main(): Promise<number> {
   const [proxySocket, gatewaySocket, executable, ...args] = process.argv.slice(2);
   if (!proxySocket || !executable) throw new Error('Invalid isolated launcher arguments');
