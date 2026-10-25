@@ -43,6 +43,20 @@ If your terminal launcher sets `CLAUDE_CONFIG_DIR` and `XDG_CONFIG_HOME`, the ex
 
 Run setup with that same `XDG_CONFIG_HOME` first. If your personal launcher clears conflicting API keys or provider variables, apply the same policy in a dedicated VS Code wrapper and its environment settings. Tether itself does not choose an authentication or billing method. Keep credentials in the official profile; never place tokens in VS Code workspace settings. See the [Pro profile instructions](RUNBOOK.md#separating-a-personal-pro-login).
 
+### Empty history with a separate profile
+
+The extension's history picker reads session files in the **extension host**, before a Claude process is launched. `claudeCode.environmentVariables` and a shell wrapper set the child's environment; they do not set the extension host's own environment. In the inspected official extension 2.1.310, using `claudeProcessWrapper` also prevents the picker from adopting the `configDirectory` reported by `claude auth status`. Chat can therefore work while the history picker still searches the default `~/.claude/projects` instead of the separate profile.
+
+Set `CLAUDE_CONFIG_DIR` to the same absolute directory in the environment that starts the extension host. For Remote WSL, add the following to the existing `~/.vscode-server/server-env-setup`, preserving any other setup:
+
+```sh
+export CLAUDE_CONFIG_DIR='/absolute/path/to/pro/claude'
+```
+
+This is VS Code's [documented WSL server environment setup](https://code.visualstudio.com/docs/remote/wsl#_advanced-environment-setup-script). The file must be valid Bourne shell syntax. It is read when the WSL VS Code Server starts, so restart that server after saving work; reloading only a window can retain the old server environment. The variable applies to that WSL server's extension hosts and newly inherited child environments, not to unrelated login shells. Keep `XDG_CONFIG_HOME` scoped to the existing Claude wrapper/settings unless the whole VS Code server deliberately uses that XDG profile.
+
+Once the host and launcher agree, reopen the project and its history picker. Existing transcripts stay in their original profile. This selects that profile's history; it does not merge conversations from other accounts, profiles, machines or projects. A normal Linux VS Code launch needs the equivalent variable in its application environment; Remote SSH needs it in that remote extension host's environment.
+
 ## Network and feature boundaries
 
 - The bundled Claude process and its Linux child tools use isolated networking through the configured VPS. Overriding proxy variables does not restore a direct external route.
@@ -55,6 +69,8 @@ Run setup with that same `XDG_CONFIG_HOME` first. If your personal launcher clea
 ## Verification and troubleshooting
 
 Open a project in the WSL window, start a new panel conversation, ask Claude to read a small file, review an edit, and select a model from the panel. If it cannot start, inspect the Claude Code output channel for a missing Node runtime, wrong executable path, or SSH/isolation failure. An already-running conversation keeps its old process; close and reopen it after a Tether update.
+
+If new chats work but history is empty, check the [separate-profile history setup](#empty-history-with-a-separate-profile) before changing SSH or copying session files. An empty picker can be a host/child profile mismatch even when the CLI itself can resume the conversation.
 
 GPU compute does not require disabling network isolation. Tether exposes supported GPU device nodes while retaining its private network namespace. See [GPU access](NETWORK.md#gpu-access).
 
