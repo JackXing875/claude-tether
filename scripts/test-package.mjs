@@ -11,7 +11,7 @@ const directory = await mkdtemp(join(tmpdir(), 'tether-package-test-'));
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 try {
   const [{ filename, files }] = JSON.parse(execFileSync(npm, ['pack', '--ignore-scripts', '--json', '--pack-destination', directory], { encoding: 'utf8' }));
-  for (const path of ['dist/src/cli.js', 'dist/src/vscode.js', 'dist/src/update.js', 'dist/src/isolated-child.js', 'src/cli.ts', 'src/vscode.ts', 'src/update.ts', 'src/settings.ts', 'tsconfig.json', 'LICENSE',
+  for (const path of ['dist/src/cli.js', 'dist/src/vscode.js', 'dist/src/update.js', 'dist/src/isolated-child.js', 'dist/src/diagnostics.js', 'src/process-supervisor.py', 'src/cli.ts', 'src/vscode.ts', 'src/update.ts', 'src/settings.ts', 'tsconfig.json', 'LICENSE',
     'docs/VSCODE.md', 'docs/NETWORK.md', 'docs/CCPROXY.md', 'docs/TEST-REPORT.md', 'CONTRIBUTING.md', 'SECURITY.md', 'START.md']) {
     assert.ok(files.some(file => file.path === path), `Missing package file: ${path}`);
   }
@@ -26,6 +26,7 @@ try {
     assert.match(execFileSync(executable, ['--help'], { encoding: 'utf8' }), /Usage: tether/);
     assert.match(execFileSync(executable, ['--help'], { encoding: 'utf8' }), /tether setup/);
     assert.match(execFileSync(executable, ['update', '--help'], { encoding: 'utf8' }), /Usage: tether update/);
+    assert.match(execFileSync(executable, ['doctor', '--inotify', '--help'], { encoding: 'utf8' }), /host inotify/);
   }
   const vscode = spawnSync(join(directory, 'bin', 'tether-vscode'), [], { encoding: 'utf8', env });
   assert.equal(vscode.status, 1); assert.equal(vscode.stdout, '');
@@ -34,6 +35,8 @@ try {
   // Exercise the shipped updater itself with the real packed artifact. Only release
   // discovery/download are substituted; installation, activation and probes are real.
   const root = join(directory, 'lib', 'node_modules', 'claude-tether');
+  const { checkIsolation } = await import(pathToFileURL(join(root, 'dist/src/isolation.js')).href);
+  checkIsolation('host'); // Includes locating and executing the shipped Python helper.
   const installed = join(root, 'package.json');
   await writeFile(installed, JSON.stringify({ ...metadata, version: '0.0.0-beta.0' }));
   const { update } = await import(pathToFileURL(join(root, 'dist/src/update.js')).href);

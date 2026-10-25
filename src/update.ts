@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { constants, existsSync, renameSync } from 'node:fs';
+import { constants, existsSync, readFileSync, renameSync } from 'node:fs';
 import { access, lstat, mkdtemp, open, readFile, rm, writeFile } from 'node:fs/promises';
 import { Agent, get } from 'node:https';
 import { basename, delimiter, dirname, join } from 'node:path';
@@ -140,8 +140,12 @@ export function activatePackage(current: string, prepared: string, backup: strin
 export async function update(options: { check?: boolean; root?: string; getBytes?: Download; log?: (message: string) => void } = {}): Promise<void> {
   const root = options.root ?? packageRoot;
   const getBytes = options.getBytes ?? download, log = options.log ?? console.log;
-  const metadata = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')) as { name: string; version: string };
-  if (metadata.name !== 'claude-tether') throw new Error('This is not a Tether installation.');
+  const installedVersion = () => {
+    const metadata = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { name: string; version: string };
+    if (metadata.name !== 'claude-tether') throw new Error('This is not a Tether installation.');
+    compareVersions(metadata.version, metadata.version);
+    return metadata.version;
+  };
   const modules = dirname(root.replace(/\/$/, '')), library = dirname(modules);
   if (!options.check) {
     if (process.platform === 'win32' || basename(root.replace(/\/$/, '')) !== 'claude-tether' || basename(modules) !== 'node_modules'
@@ -167,13 +171,15 @@ export async function update(options: { check?: boolean; root?: string; getBytes
       }
       await lock.writeFile(`${process.pid}\n`);
     }
-    log(`Checking GitHub Releases (installed: ${metadata.version})...`);
-    const release = selectRelease(await listReleases(getBytes, controller.signal), metadata.version);
-    if (compareVersions(release.version, metadata.version) <= 0) {
-      log(`Tether ${metadata.version} is up to date${release.version !== metadata.version ? ' (installed version is newer than the published release)' : ''}.`);
+    // Decide from the package protected by this lock, not a pre-lock snapshot.
+    const current = installedVersion();
+    log(`Checking GitHub Releases (installed: ${current})...`);
+    const release = selectRelease(await listReleases(getBytes, controller.signal), current);
+    if (compareVersions(release.version, current) <= 0) {
+      log(`Tether ${current} is up to date${release.version !== current ? ' (installed version is newer than the published release)' : ''}.`);
       return;
     }
-    if (options.check) { log(`Update available: ${metadata.version} -> ${release.version}. Run tether update to install.`); return; }
+    if (options.check) { log(`Update available: ${current} -> ${release.version}. Run tether update to install.`); return; }
     log(`Downloading ${release.tag} and verifying SHA-256...`);
     const manifest = await getBytes(release.checksums, 64 * 1024, controller.signal);
     const archive = await getBytes(release.archive, 32 * 1024 * 1024, controller.signal);
@@ -207,12 +213,18 @@ export async function update(options: { check?: boolean; root?: string; getBytes
     controller.signal.throwIfAborted();
     const backupDirectory = await mkdtemp(join(library, '.tether-backup-'));
     const backup = join(backupDirectory, 'claude-tether');
-    try { controller.signal.throwIfAborted(); activatePackage(root, prepared, backup); }
+    try {
+      controller.signal.throwIfAborted();
+      // External/manual installers may not honor our lock. Refuse any changed
+      // installation; re-read synchronously immediately before the renames.
+      if (installedVersion() !== current) throw new Error('The installed Tether version changed during the update. No package was replaced; run tether update again.');
+      activatePackage(root, prepared, backup);
+    }
     catch (error) {
       if (!existsSync(backup)) await rm(backupDirectory, { recursive: true, force: true });
       throw error;
     }
-    log(`Updated Tether ${metadata.version} -> ${release.version}. Start a new Claude or VS Code session to use it.`);
+    log(`Updated Tether ${current} -> ${release.version}. Start a new Claude or VS Code session to use it.`);
     log(`Previous package: ${backup}`);
   } finally {
     try { if (staging) await rm(staging, { recursive: true, force: true }); }

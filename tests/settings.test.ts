@@ -15,7 +15,7 @@ test('settings are optional, replaced atomically and contain only supported pref
   assert.deepEqual(await readSettings(path), { ssh: 'second-vps', claude: 'claude' });
   assert.deepEqual(await readdir(dirname(path)), ['config.json']);
   for (const invalid of ['{', 'null', '[]', '{"ssh":1}', '{"ssh":""}', '{"token":"not-supported"}',
-    '{"network":"auto"}', '{"ccproxyPort":"0"}', '{"ccproxyPort":"65536"}', '{"ccproxyPort":"http://remote"}']) {
+    '{"network":"auto"}', '{"processes":"auto"}', '{"ccproxyPort":"0"}', '{"ccproxyPort":"65536"}', '{"ccproxyPort":"http://remote"}']) {
     await writeFile(path, invalid);
     await assert.rejects(readSettings(path), /Invalid settings/);
     assert.equal(await readFile(path, 'utf8'), invalid);

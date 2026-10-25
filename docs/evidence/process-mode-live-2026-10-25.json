@@ -1,0 +1,170 @@
+{
+  "date": "2026-10-25",
+  "timezone": "Asia/Shanghai",
+  "version": "0.3.0-beta.6",
+  "candidateArchiveSha256": "b1ad5ac4622a599e645d21598f3b7f2710106318daf8e8df8ae52ae9711221c3",
+  "candidateArchiveScope": "Packed candidate tested before adding the completed reports; final release archive checksum is in SHA256SUMS",
+  "runtimeManifestSha256": "d74804deef088e13dfe7dc7f55fc80f8143772554f4072fbbfc705503153fdd1",
+  "runtimeFiles": {
+    "dist/src/bridge.js": "ae94942519a5273b480ce75094bf96d5c9a11303af448b80527df4bdb1acfc39",
+    "dist/src/cli.js": "915405d1813f19410607abe62f9627fe93935830af5f2d4731a984aa6525c154",
+    "dist/src/diagnostics.js": "2519ef5f2cdea83486c4a1d4f25dff180a6db77cb3eda9db9e57d5d69178b7d9",
+    "dist/src/environment.js": "6b3dac5869b1151a5bea95d43ed92574ebcf10e5d374f542b1dcf77238b0678c",
+    "dist/src/isolated-child.js": "ad88c67121a6202fff5bd2a73efe23f9dc4804e214dcf3d36b9d331a46be7ffd",
+    "dist/src/isolation.js": "2890fb0574a8c1d47fd05e433f791bf75e97e9561845c968370e6da243cad692",
+    "dist/src/proxy.js": "5c0bd2d296f8f3a9d9a774082843d761d0f7b751a3c31cc988f3c0bbe4aa2784",
+    "dist/src/settings.js": "8dcced5bf129f922bb85ae98f09e2badbf91e5374ed164f829234e00c190e87e",
+    "dist/src/tunnel.js": "0e987fce29d5af365bbba8745a660d7f843faf1225e5b8a034d2302685ef7221",
+    "dist/src/update.js": "71e1eb22d0e1c3bb138ea246484aca624c192c6e469932764a37393864440e23",
+    "dist/src/vscode.js": "ce5b6e7eb8e0fbd53cc60c7b216fd36dbbf87d9fb327160d9030ebd24b12631e",
+    "src/bridge.ts": "1fb9544401ccb74b9f96907ab163f25cbe5bd178a2d7c24657260700d88bf90f",
+    "src/cli.ts": "75c939bb3bdef5e7902f39f3aa03d824eb6786ead5487bb2e14f50eae44be16d",
+    "src/diagnostics.ts": "459569df5b9d414181c6f319f28370c894c4d9ae419363ef41494af1bd826617",
+    "src/environment.ts": "6cda44323f0f2371e1fdebf3c0b8385936a4d1f588fb33f0b7aac5c9e44fbf5c",
+    "src/isolated-child.ts": "39dccbad1c0f2977c3a1b292c0bb8ae0898d2aedbaa9bea56d2ac42a053d4e42",
+    "src/isolation.ts": "0efd59f784db199428dab4ec825a950404f7afd4fe942b4e96a0ea6b68ae910a",
+    "src/process-supervisor.py": "04bc00491a0ee0b760722e5f4f6f8b0325ad4750d23870924998c78174f5f011",
+    "src/proxy.ts": "d39b49b5dd517891e600d79c1d8a4756b90ba70872b8be2e66d45466dcc5abae",
+    "src/settings.ts": "aaa669b4a0d3bdcd5fe96089e7b3390426cc6b94d9632711f4a806112f9e1d87",
+    "src/tunnel.ts": "150101ad2696b849e4e901ffb0bb4fa897080d7157bf2e4f16fbab08edb1904a",
+    "src/update.ts": "1028c38b46cd3e1480200c42522367bf61edc6f47301bf91b1aea7e033673a8a",
+    "src/vscode.ts": "8454541db23e0d9bf6ae448d88a33cd65ec1dd52b33478954589a9940944d26c"
+  },
+  "wsl": {
+    "claude": "2.1.310",
+    "sdk": "0.3.309",
+    "auth": "existing first-party Pro profile",
+    "models": [
+      "claude-opus-5-5",
+      "claude-sonnet-5-5"
+    ],
+    "tools": [
+      "Bash",
+      "Edit",
+      "Read",
+      "Write",
+      "mcp__tether_fixture__nonce"
+    ],
+    "permissions": [
+      {
+        "name": "mcp__tether_fixture__nonce",
+        "allowed": true
+      },
+      {
+        "name": "Edit",
+        "allowed": true
+      },
+      {
+        "name": "Bash",
+        "allowed": true
+      },
+      {
+        "name": "Bash",
+        "allowed": true
+      },
+      {
+        "name": "Write",
+        "allowed": true
+      }
+    ],
+    "hooks": [
+      "Bash",
+      "Edit",
+      "Read",
+      "Write",
+      "mcp__tether_fixture__nonce"
+    ],
+    "mcpCalls": 1,
+    "probe": {
+      "hostProcessVisible": true,
+      "hostWatcherObserved": true,
+      "maxUserWatches": 524288,
+      "diagnosticIncomplete": true,
+      "processMode": "host",
+      "networkMode": "isolated",
+      "noDefaultRoute": true,
+      "gpu": {
+        "available": true,
+        "devices": 1,
+        "initialized": false
+      }
+    },
+    "modelSwitchAcknowledged": true,
+    "cliResume": {
+      "passed": true,
+      "exitCode": 0,
+      "models": [
+        "claude-opus-5-5"
+      ]
+    },
+    "normalEofCleanup": true,
+    "nativeTerminal": {
+      "ctrlCClearedInputWithoutExiting": true,
+      "nativeModelMenu": true,
+      "exitCode": 0,
+      "signal": null,
+      "modelPromptSubmitted": false
+    },
+    "passed": true
+  },
+  "nativeLinux": {
+    "candidate": "0.3.0-beta.6",
+    "candidateArchiveSha256": "b1ad5ac4622a599e645d21598f3b7f2710106318daf8e8df8ae52ae9711221c3",
+    "installedVersionBefore": "0.3.0-beta.5",
+    "runtime": "v24.14.0",
+    "claude": "2.1.310 (Claude Code)",
+    "auth": {
+      "loggedIn": true,
+      "authMethod": "claude.ai",
+      "apiProvider": "firstParty",
+      "subscriptionType": "pro"
+    },
+    "probe": {
+      "hostProcessVisible": true,
+      "hostWatcherObserved": true,
+      "maxUserWatches": 65536,
+      "diagnosticIncomplete": true,
+      "networkMode": "isolated",
+      "processMode": "host",
+      "noDefaultRoute": true,
+      "devices": {
+        "/dev/nvidia0": true,
+        "/dev/nvidiactl": true,
+        "/dev/nvidia-uvm": true,
+        "/dev/nvidia-uvm-tools": true,
+        "/dev/nvidia-modeset": true
+      },
+      "torch": "2.7.1+cu126",
+      "cudaBuild": "12.6",
+      "torchAvailable": true,
+      "deviceCount": 1,
+      "cudaContextInitialized": false
+    },
+    "models": [
+      "claude-sonnet-5-5"
+    ],
+    "tools": [
+      "Bash"
+    ],
+    "exitCode": 0,
+    "installedVersionAfter": "0.3.0-beta.5",
+    "preferencesUnchanged": true,
+    "passed": true
+  },
+  "automated": {
+    "tests": 75,
+    "passed": 75,
+    "failed": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "productionAuditVulnerabilities": 0
+  },
+  "actualVscodePanelUiRetested": false,
+  "realAccountFaultInjection": false,
+  "gpuTensorsAllocated": false,
+  "existingInstallationsReplaced": false,
+  "harnessCorrections": [
+    "An extra punctuation argument was denied by the exact CLI allow rule; corrected prompt passed without wider permissions or product changes.",
+    "Explicitly trusted only the disposable test directory at the native terminal trust dialog."
+  ]
+}

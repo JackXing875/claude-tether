@@ -7,7 +7,7 @@ Tether is an early beta focused on a small, dependable launch and transport laye
 Use Node.js from `.nvmrc`. On Ubuntu/Debian, integration tests also need:
 
 ```bash
-sudo apt-get install openssh-client openssh-server openssl bubblewrap
+sudo apt-get install openssh-client openssh-server openssl bubblewrap python3
 sudo mkdir -p /run/sshd
 npm ci
 npm test

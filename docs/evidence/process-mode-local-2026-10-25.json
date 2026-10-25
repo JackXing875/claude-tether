@@ -1,0 +1,61 @@
+{
+  "recorded_date": "2026-10-25",
+  "timezone": "Asia/Shanghai",
+  "candidate": {
+    "base_commit": "a01ce6d0b2573a4d70e539db94028da7c6f84306",
+    "package_version": "0.3.0-beta.5",
+    "state": "unreleased working tree including uncommitted changes",
+    "runtime_source_manifest_sha256": "beba5361f2a4de814d65888e05f0683e45b5a5a89d0cb1bf6f66f06e5a90e78b",
+    "manifest_format": "sorted relative paths; each line is SHA256(file bytes), two spaces, path, newline; UTF-8 manifest",
+    "manifest_files": [
+      "package-lock.json",
+      "package.json",
+      "src/bridge.ts",
+      "src/cli.ts",
+      "src/diagnostics.ts",
+      "src/environment.ts",
+      "src/isolated-child.ts",
+      "src/isolation.ts",
+      "src/process-supervisor.py",
+      "src/proxy.ts",
+      "src/settings.ts",
+      "src/tunnel.ts",
+      "src/update.ts",
+      "src/vscode.ts"
+    ]
+  },
+  "verification": {
+    "origin": "Existing implementation-run logs rechecked when writing the development log; no test rerun in this documentation-only step",
+    "tests": {
+      "passed": 75,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "package_install_and_self_update": "passed",
+    "production_audit_vulnerabilities": 0,
+    "logs": [
+      {
+        "local_gitignored_path": "artifacts/process-mode-fixes/tests.log",
+        "sha256": "e7daa81addef59214a0fac660534b55f24df059468d343971bc07f3b0feee01a"
+      },
+      {
+        "local_gitignored_path": "artifacts/process-mode-fixes/package-test.log",
+        "sha256": "8337ed2aa05038085c1204494301ea98270dc259f173f5f3a6efea9dafc088a2"
+      },
+      {
+        "local_gitignored_path": "artifacts/process-mode-fixes/dependency-audit.json",
+        "sha256": "a99d1d49e911f6e58b12f295e531174ecd55548aa717ee57e976505584cebfb3"
+      },
+      {
+        "local_gitignored_path": "artifacts/process-mode-fixes/summary.json",
+        "sha256": "be100e11e0f4245dd7836ad0b0a689ec5df904dafbbec883a99ffe8ec11ef787"
+      }
+    ]
+  },
+  "real_claude_for_this_candidate": "pending normal-use acceptance; no account requests in these tests",
+  "lab_server_deployment": "not performed",
+  "release_publication": "not performed",
+  "p3_release_workflow": "unchanged and deferred",
+  "real_account_fault_injection": "excluded from the planned normal-use acceptance"
+}

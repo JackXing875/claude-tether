@@ -5,6 +5,7 @@ import { createConnection, createServer } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
 import test from 'node:test';
 import { connectSocks, startProxy } from '../src/proxy.js';
+import { localSocket } from '../src/bridge.js';
 import { connectProxy, listen, until } from './helpers.js';
 
 test('CONNECT streams bytes with backpressure and closes both sides', { timeout: 10_000 }, async t => {
@@ -121,7 +122,7 @@ test('upstream failure returns 502 without retrying or leaking diagnostics', asy
   assert.equal(result.status, 502); assert.equal(calls, 1); result.socket.destroy();
 });
 
-test('client disconnect cancels a connection waiting for the tunnel', { timeout: 5_000 }, async t => {
+test('client reset cancels a connection waiting for the tunnel', { timeout: 5_000 }, async t => {
   let started = false, cancelled = false;
   const proxy = await startProxy(async (_host, _port, signal) => {
     started = true;
@@ -131,8 +132,138 @@ test('client disconnect cancels a connection waiting for the tunnel', { timeout:
   t.after(proxy.close);
   const socket = createConnection({ host: '127.0.0.1', port: Number(new URL(proxy.url).port) });
   socket.write('CONNECT upstream.example:443 HTTP/1.1\r\n\r\n');
-  await until(() => started); socket.destroy();
+  await until(() => started); socket.resetAndDestroy();
   await until(() => cancelled);
+});
+
+test('CONNECT retains a write-half-close received before the upstream connects', { timeout: 5_000 }, async t => {
+  const port = await listen(t, createServer({ allowHalfOpen: true }, socket => {
+    let body = '';
+    socket.on('data', chunk => { body += String(chunk); });
+    socket.on('end', () => socket.end('ack:' + body));
+  }));
+  const proxy = await startProxy(async (_host, _port, signal) => {
+    await delay(100);
+    return localSocket(port, signal);
+  });
+  t.after(proxy.close);
+  const client = await localSocket(Number(new URL(proxy.url).port), AbortSignal.timeout(2_000));
+  t.after(() => client.destroy());
+  let response = '';
+  client.on('data', chunk => { response += String(chunk); });
+  const ended = once(client, 'end');
+  client.end('CONNECT upstream.example:443 HTTP/1.1\r\nHost: upstream.example\r\n\r\nhello');
+  await ended;
+  assert.equal(response, 'HTTP/1.1 200 Connection Established\r\n\r\nack:hello');
+});
+
+for (const method of ['GET', 'DELETE', 'POST']) {
+  test(`HTTP ${method} streams chunked bodies before the upload ends`, { timeout: 5_000 }, async t => {
+    let firstChunk!: () => void;
+    const streamed = new Promise<void>(resolve => { firstChunk = resolve; });
+    let received = '';
+    const port = await listen(t, httpServer((req, res) => {
+      assert.equal(req.method, method);
+      assert.equal(req.headers['transfer-encoding'], 'chunked');
+      assert.equal(req.headers['content-length'], undefined);
+      req.on('data', chunk => { received += String(chunk); firstChunk(); });
+      req.on('end', () => res.end(received));
+    }));
+    const proxy = await startProxy((_host, _port, signal) => localSocket(port, signal));
+    t.after(proxy.close);
+    const req = request(proxy.url, { method, path: 'http://origin.invalid/body', headers: { 'transfer-encoding': 'chunked' } });
+    t.after(() => req.destroy());
+    const result = new Promise<string>((resolve, reject) => {
+      req.on('error', reject);
+      req.on('response', res => {
+        assert.equal(res.statusCode, 200);
+        let body = '';
+        res.on('error', reject).on('data', chunk => { body += String(chunk); }).on('end', () => resolve(body));
+      });
+    });
+    req.write('hello');
+    await streamed;
+    assert.equal(received, 'hello', 'the proxy must not buffer the whole request');
+    req.end(' world');
+    assert.equal(await result, 'hello world');
+  });
+}
+
+test('GET and DELETE preserve explicit body lengths without adding chunked encoding', { timeout: 5_000 }, async t => {
+  const port = await listen(t, httpServer((req, res) => {
+    assert.equal(req.headers['transfer-encoding'], undefined);
+    assert.equal(req.headers['content-length'], '5');
+    req.pipe(res);
+  }));
+  const proxy = await startProxy((_host, _port, signal) => localSocket(port, signal));
+  t.after(proxy.close);
+  for (const method of ['GET', 'DELETE']) {
+    const result = await new Promise<string>((resolve, reject) => {
+      const req = request(proxy.url, { method, path: 'http://origin.invalid/body', headers: { 'content-length': '5' } }, res => {
+        let body = '';
+        res.on('error', reject).on('data', chunk => { body += String(chunk); }).on('end', () => resolve(body));
+      });
+      req.on('error', reject).end('hello');
+    });
+    assert.equal(result, 'hello');
+  }
+});
+
+test('invalid final statuses fail only their request and subsequent HTTP requests succeed', { timeout: 5_000 }, async t => {
+  const statuses = [0, 99, 600, 999, 200];
+  let requests = 0, closed = 0;
+  const port = await listen(t, createServer(socket => {
+    socket.once('close', () => closed++);
+    socket.once('data', () => socket.end(`HTTP/1.1 ${String(statuses[requests++]).padStart(3, '0')} Test\r\nContent-Length: 0\r\nConnection: close\r\n\r\n`));
+  }));
+  const proxy = await startProxy((_host, _port, signal) => localSocket(port, signal));
+  t.after(proxy.close);
+  for (const expected of [502, 502, 502, 502, 200]) {
+    const status = await new Promise<number>((resolve, reject) => {
+      const req = get(proxy.url, { path: 'http://origin.invalid/' }, res => {
+        res.resume(); res.on('end', () => resolve(res.statusCode!)); res.on('error', reject);
+      });
+      req.on('error', reject);
+    });
+    assert.equal(status, expected);
+  }
+  assert.equal(requests, statuses.length, 'failed requests must not be replayed');
+  await until(() => closed === statuses.length);
+});
+
+test('unsolicited upstream 101 returns 502 and closes both connections', { timeout: 5_000 }, async t => {
+  let originClosed = false;
+  const port = await listen(t, createServer(socket => {
+    socket.once('close', () => { originClosed = true; });
+    socket.once('data', () => socket.write('HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\npayload'));
+  }));
+  const proxy = await startProxy((_host, _port, signal) => localSocket(port, signal));
+  t.after(proxy.close);
+  const client = createConnection({ host: '127.0.0.1', port: Number(new URL(proxy.url).port) });
+  t.after(() => client.destroy());
+  let response = '';
+  client.on('data', chunk => { response += String(chunk); });
+  const closed = once(client, 'close');
+  client.write('GET http://origin.invalid/ HTTP/1.1\r\nHost: origin.invalid\r\nConnection: close\r\n\r\n');
+  await closed;
+  assert.match(response, /^HTTP\/1\.1 502 /);
+  assert.ok(!response.includes('payload'));
+  await until(() => originClosed);
+});
+
+test('ordinary HTTP upgrade requests receive 501 without dialing', { timeout: 5_000 }, async t => {
+  let calls = 0;
+  const proxy = await startProxy(async () => { calls++; throw new Error('must not dial'); });
+  t.after(proxy.close);
+  const client = createConnection({ host: '127.0.0.1', port: Number(new URL(proxy.url).port) });
+  t.after(() => client.destroy());
+  let response = '';
+  client.on('data', chunk => { response += String(chunk); });
+  const closed = once(client, 'close');
+  client.write('GET http://origin.invalid/ HTTP/1.1\r\nHost: origin.invalid\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n');
+  await closed;
+  assert.match(response, /^HTTP\/1\.1 501 /);
+  assert.equal(calls, 0);
 });
 
 test('SOCKS handles fragmented headers, remote DNS and coalesced target bytes', { timeout: 5_000 }, async t => {

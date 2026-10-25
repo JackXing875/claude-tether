@@ -28,7 +28,7 @@ async function readBytes(socket: Socket, size: number): Promise<Buffer> {
 }
 
 export async function openSocks(port: number, signal: AbortSignal): Promise<Socket> {
-  const socket = createConnection({ host: '127.0.0.1', port, signal });
+  const socket = createConnection({ host: '127.0.0.1', port, signal, allowHalfOpen: true });
   socket.on('error', () => {}); // Also covers cancellation between awaited reads.
   try {
     await once(socket, 'connect');
@@ -86,6 +86,11 @@ export async function startProxy(dial: Dial) {
     req.once('aborted', () => controller.abort());
     void (async () => {
       let agent: Agent | undefined;
+      const fail = () => {
+        if (res.destroyed || res.writableEnded) return;
+        if (!res.headersSent) res.writeHead(502, { Connection: 'close' }).end();
+        else res.destroy();
+      };
       try {
         const socket = await dial(target.hostname.replace(/^\[|\]$/g, ''), Number(target.port || 80), controller.signal);
         if (controller.signal.aborted) { socket.destroy(); return; }
@@ -93,21 +98,44 @@ export async function startProxy(dial: Dial) {
         socket.once('close', () => sockets.delete(socket));
         agent = new Agent({ keepAlive: false });
         agent.createConnection = () => socket;
+        const headers = { ...forwardedHeaders(req.headers), host: target.host };
+        // IncomingMessage removes chunk boundaries, so request() must encode them
+        // again even for methods (such as GET/DELETE) that default to no body.
+        if (req.headers['transfer-encoding'] !== undefined) {
+          headers['transfer-encoding'] = req.headers['transfer-encoding'];
+          delete headers['content-length'];
+        } else if (req.headers['content-length'] !== undefined) {
+          headers['content-length'] = req.headers['content-length'];
+        }
         const upstream = request(target, { method: req.method, agent, signal: controller.signal,
-          headers: { ...forwardedHeaders(req.headers), host: target.host } }, response => {
-          res.writeHead(response.statusCode!, forwardedHeaders(response.headers));
-          response.on('error', () => res.destroy());
-          response.pipe(res);
+          headers }, response => {
+          response.on('error', fail);
+          // This callback runs after the surrounding try/catch has returned.
+          // A malformed upstream response must only fail its own request.
+          try {
+            const status = response.statusCode;
+            if (status === undefined || !Number.isInteger(status) || status < 200 || status > 599) {
+              throw new Error('Invalid upstream HTTP status');
+            }
+            res.writeHead(status, forwardedHeaders(response.headers));
+            response.pipe(res);
+          } catch {
+            response.destroy();
+            upstream.destroy();
+            fail();
+          }
         });
-        upstream.on('error', () => {
-          if (!res.headersSent) res.writeHead(502, { Connection: 'close' }).end();
-          else res.destroy();
+        upstream.on('error', fail);
+        upstream.on('upgrade', (_response, upgraded) => {
+          upgraded.destroy();
+          upstream.destroy();
+          fail();
         });
         res.once('close', () => agent?.destroy());
         req.pipe(upstream);
       } catch {
         agent?.destroy();
-        if (!res.destroyed) res.writeHead(502, { Connection: 'close' }).end();
+        fail();
       }
     })();
   });
@@ -118,6 +146,7 @@ export async function startProxy(dial: Dial) {
     socket.on('close', () => sockets.delete(socket));
   });
   server.on('connect', (req, client: Socket, head) => {
+    client.allowHalfOpen = true;
     const match = /^(?:\[([a-fA-F0-9:]+)\]|([a-zA-Z0-9.-]+)):(\d{1,5})$/.exec(req.url ?? '');
     const port = Number(match?.[3]);
     if (!match || port < 1 || port > 65535) {
@@ -126,8 +155,8 @@ export async function startProxy(dial: Dial) {
     }
     const controller = new AbortController();
     client.once('close', () => controller.abort());
-    // Read while dialing so a cancelled client releases its pending connection.
-    // Bound the uncommon payload sent before the CONNECT response.
+    // Read while dialing, retaining FIN as a write-half-close rather than a
+    // cancellation. Bound the payload sent before the CONNECT response.
     const pending: Buffer[] = [head];
     let pendingBytes = head.length;
     const collect = (chunk: Buffer) => {
@@ -135,15 +164,14 @@ export async function startProxy(dial: Dial) {
       if (pendingBytes > 64 * 1024) client.destroy();
       else pending.push(chunk);
     };
-    const ended = () => client.destroy();
-    client.on('data', collect).once('end', ended);
+    client.on('data', collect);
     client.resume();
     void (async () => {
       try {
         const upstream = await dial(match[1] ?? match[2]!, port, controller.signal);
         if (client.destroyed) { upstream.destroy(); return; }
         client.pause();
-        client.off('data', collect).off('end', ended);
+        client.off('data', collect);
         upstream.on('error', () => client.destroy());
         upstream.once('close', () => {
           // On a normal EOF, pipe() ends the client after its buffered writes drain.
@@ -151,6 +179,7 @@ export async function startProxy(dial: Dial) {
         });
         client.once('close', () => upstream.destroy());
         for (const socket of [client, upstream]) {
+          socket.allowHalfOpen = true;
           socket.setNoDelay(true);
           socket.setKeepAlive(true, 30_000);
           socket.setTimeout(0); // No idle deadline on a model's streaming response.
@@ -158,11 +187,17 @@ export async function startProxy(dial: Dial) {
         client.write('HTTP/1.1 200 Connection Established\r\n\r\n');
         for (const chunk of pending) if (chunk.length) upstream.write(chunk);
         upstream.pipe(client);
-        client.pipe(upstream); // Native backpressure; never buffer or replay a request.
+        if (client.readableEnded) upstream.end();
+        else client.pipe(upstream); // Native backpressure; never buffer or replay a request.
       } catch {
         if (!client.destroyed) client.end('HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
       }
     })();
+  });
+  // Ordinary HTTP Upgrade is unsupported. HTTPS upgrades inside CONNECT remain
+  // transparent byte streams and never enter this handler.
+  server.on('upgrade', (_req, client) => {
+    client.end('HTTP/1.1 501 Not Implemented\r\nConnection: close\r\nContent-Length: 0\r\n\r\n', () => client.destroy());
   });
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');

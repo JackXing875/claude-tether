@@ -26,7 +26,7 @@ test('Unix bridge drains a large response to a slow reader without truncation', 
   assert.deepEqual(Buffer.concat(chunks), expected);
 });
 
-test('bridge cancels a pending SSH connection when the client disconnects', async t => {
+test('bridge cancels a pending SSH connection when the client resets it', { timeout: 5_000 }, async t => {
   let pending = false, aborted = false;
   const bridge = await startBridge(async signal => {
     pending = true;
@@ -36,7 +36,50 @@ test('bridge cancels a pending SSH connection when the client disconnects', asyn
   t.after(bridge.close);
   const client = createConnection({ host: '127.0.0.1', port: bridge.port! });
   t.after(() => client.destroy());
-  await until(() => pending); client.destroy(); await until(() => aborted);
+  await until(() => pending); client.resetAndDestroy(); await until(() => aborted);
+});
+
+for (const size of [5, 2 * 1024 * 1024]) {
+  test(`bridge preserves ${size} bytes and the response after a write-half-close during dialing`, { timeout: 5_000 }, async t => {
+    const expected = Buffer.alloc(size, 'u');
+    const port = await listen(t, createServer({ allowHalfOpen: true }, socket => {
+      const chunks: Buffer[] = [];
+      socket.on('data', chunk => chunks.push(chunk));
+      socket.on('end', () => {
+        assert.deepEqual(Buffer.concat(chunks), expected);
+        socket.end('received-all');
+      });
+    }));
+    const bridge = await startBridge(async signal => {
+      await delay(100);
+      return localSocket(port, signal);
+    });
+    t.after(bridge.close);
+    const client = await localSocket(bridge.port!, AbortSignal.timeout(2_000));
+    t.after(() => client.destroy());
+    const chunks: Buffer[] = [];
+    client.on('data', chunk => chunks.push(chunk));
+    const ended = once(client, 'end');
+    client.end(expected);
+    await ended;
+    assert.equal(Buffer.concat(chunks).toString(), 'received-all');
+  });
+}
+
+test('upstream write-half-close still permits the client to finish sending', { timeout: 5_000 }, async t => {
+  let received = '';
+  const port = await listen(t, createServer({ allowHalfOpen: true }, socket => {
+    socket.end('ready');
+    socket.on('data', chunk => { received += String(chunk); });
+  }));
+  const bridge = await startBridge(signal => localSocket(port, signal));
+  t.after(bridge.close);
+  const client = await localSocket(bridge.port!, AbortSignal.timeout(2_000));
+  t.after(() => client.destroy());
+  client.resume();
+  await once(client, 'end');
+  client.end('after-upstream-fin');
+  await until(() => received === 'after-upstream-fin');
 });
 
 test('bridge backpressure preserves a large upload while SSH establishment is delayed', async t => {

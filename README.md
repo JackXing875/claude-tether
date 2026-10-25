@@ -6,13 +6,15 @@ Tether is a lightweight launcher for the official Claude Code CLI. It connects t
 
 The official **VS Code native panel** can use the same transport through `tether-vscode`; see the [extension setup](docs/VSCODE.md). Linux/WSL GPU compute remains available inside network isolation.
 
-**Beta: `v0.3.0-beta.5`** · [Release notes](docs/releases/v0.3.0-beta.5.md) · [Operations guide](docs/RUNBOOK.md) · [Contributing](CONTRIBUTING.md)
+**Beta: `v0.3.0-beta.6`** · [Release notes](docs/releases/v0.3.0-beta.6.md) · [Operations guide](docs/RUNBOOK.md) · [Contributing](CONTRIBUTING.md)
+
+Beta.6 separates process visibility from network isolation, adds host inotify diagnostics and fixes transport/update reliability issues. Default host process mode now requires Python 3.9+; `--processes isolated` retains the previous private PID namespace.
 
 ## Quick start
 
 You need:
 
-- **Linux/WSL2 with bubblewrap 0.9+** and working unprivileged user namespaces (`sudo apt-get install bubblewrap` on Ubuntu).
+- **Linux/WSL2 with bubblewrap 0.9+** and working unprivileged user namespaces, plus **Python 3.9+** for default host-process supervision (`sudo apt-get install bubblewrap python3` on Ubuntu).
 - **Node.js 24.14 or later in the 24.x line** and npm.
 - The [official Claude Code CLI](https://code.claude.com/docs/en/setup), installed locally.
 - An OpenSSH client and a VPS you can reach using an SSH key or ssh-agent. The VPS must allow TCP forwarding.
@@ -22,7 +24,7 @@ If `claude --version` and key-based `ssh my-vps` already work, no additional ser
 **1. Install the beta**
 
 ```bash
-npm install --global https://github.com/JackXing875/claude-tether/releases/download/v0.3.0-beta.5/claude-tether-0.3.0-beta.5.tgz
+npm install --global https://github.com/JackXing875/claude-tether/releases/download/v0.3.0-beta.6/claude-tether-0.3.0-beta.6.tgz
 ```
 
 The release contains compiled JavaScript and source code. End users do not need TypeScript, Git, a database, or a build step. Beta packages are distributed through GitHub Releases; this command does not rely on an npm registry publication.
@@ -53,6 +55,7 @@ That is the everyday command. The official Claude interface opens in your curren
 | `tether` | Start local Claude using the saved VPS |
 | `tether setup user@host` | Validate and save a new default destination |
 | `tether doctor` | Check the local executable and SSH tunnel without a model request |
+| `tether doctor --inotify` | Read host inotify statistics for the current user, without a model request |
 | `tether update` | Download, verify and install the newest GitHub release |
 | `tether update --check` | Check for an update without changing the installation |
 | `tether -- --continue` | Continue using Claude's own session handling |
@@ -60,6 +63,8 @@ That is the everyday command. The official Claude interface opens in your curren
 | `tether -- auth login` | Run the official local login flow through the tunnel |
 | `tether --ssh another-vps` | Override the destination for one invocation |
 | `tether --network proxy` | Explicit compatibility mode; settings may bypass the proxy |
+| `tether --processes isolated` | Hide host processes using a private PID namespace for this session |
+| `tether setup --processes host` | Save the default host process view while retaining network isolation |
 | `tether --ccproxy-port 4000` | Experimental SSH access to a VPS-local ccproxy gateway |
 | `tether --no-ccproxy` | Disable a saved experimental gateway |
 | `tether --help` | Show all options |
@@ -84,9 +89,11 @@ Official Claude + tools → local proxy → private Unix bridge → SSH → sshd
   project files, login, sessions stay local
 ```
 
-The default `isolated` mode gives Claude and its Linux descendants a network namespace with no external IP route. A private Unix socket connects its HTTP(S) proxy to the host's SSH tunnel. Overriding proxy settings cannot restore direct IP access. Exiting the launcher also stops its isolated descendants, including detached tools and SSH.
+The default `--network isolated --processes host` gives Claude and its Linux descendants a network namespace with no external IP route while keeping host processes visible to tools such as `ps`. A private Unix socket connects its HTTP(S) proxy to the host's SSH tunnel. Overriding proxy settings cannot restore direct IP access. A descendant supervisor cleans up this session's tools on exit, including detached tools; SSH has separate supervision.
 
-Tether has **zero npm runtime dependencies**. Isolation uses the system `bwrap` executable; the default VPS path still needs only sshd. No root daemon, global firewall change or TLS interception is required.
+Linux process permissions still apply: some host `/proc` details remain unreadable from the user namespace. `tether doctor --inotify` provides a limited read-only host diagnostic for watch records and actual kernel limits. To retain the previous private PID namespace, select `--processes isolated`. See [process visibility and cleanup](docs/NETWORK.md#process-visibility-and-cleanup) for the permission and lifecycle differences.
+
+Tether has **zero npm runtime dependencies**. Isolation uses system `bwrap`; host process mode additionally uses Python's standard library for Linux descendant supervision. The default VPS path still needs only sshd. No root daemon, global firewall change or TLS interception is required.
 
 For HTTPS through the default SSH transport, TLS remains between the local client and the destination. Destination DNS is resolved on the VPS. Ordinary HTTP is also supported, with its normal lack of end-to-end encryption. The optional ccproxy path terminates API requests at the gateway; see its separate [experimental status](docs/CCPROXY.md).
 
@@ -114,6 +121,8 @@ The [operations guide](docs/RUNBOOK.md) covers SSH setup, separate Pro profiles,
 
 Linux/WSL2 isolation has passed real Pro calls with local tools, MCP/hooks, Sonnet-to-Opus session resume and native `/model`; see the [new validation report](docs/ISOLATED-LIVE-REPORT.md) and [automated coverage](docs/TEST-REPORT.md). Longer use and active model generation during outages remain unverified.
 
+The beta.6 candidate also passed real Claude Code 2.1.310 calls on WSL and native Linux: host process/watch diagnostics, GPU discovery, SDK permission callbacks, model switching and CLI resume. See [process-mode validation](docs/PROCESS-MODE-LIVE-REPORT.md) for exact coverage, including the distinction between SDK transport and actual VS Code UI testing.
+
 An optional ccproxy connector preserves HTTP bytes through SSH. Upstream compatibility was tested with synthetic credentials; **real Pro use through ccproxy is not validated or enabled by default**. Its current logging and TLS defaults need further work before routine use. No identity spoofing is included. Network isolation and fingerprint changes cannot establish immunity from account restrictions.
 
 This is an independent project, not an Anthropic product or an officially endorsed integration.
@@ -128,7 +137,7 @@ npm test
 npm run test:package
 ```
 
-Development tests require OpenSSH client/server binaries, OpenSSL and bubblewrap with user namespaces enabled. They create isolated local fixtures and do not use your Claude account or personal SSH settings. See [CONTRIBUTING.md](CONTRIBUTING.md) for prerequisites and the release process.
+Development tests require OpenSSH client/server binaries, OpenSSL, Python 3.9+ and bubblewrap with user namespaces enabled. They create isolated local fixtures and do not use your Claude account or personal SSH settings. See [CONTRIBUTING.md](CONTRIBUTING.md) for prerequisites and the release process.
 
 ## License
 
